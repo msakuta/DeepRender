@@ -1,7 +1,9 @@
 mod app;
 mod matrix;
+mod model;
 
 use app::DeepRenderApp;
+use model::Model;
 
 use self::matrix::Matrix;
 

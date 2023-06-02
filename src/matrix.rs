@@ -35,6 +35,14 @@ impl Matrix {
         }
     }
 
+    pub(crate) fn rand(row: usize, col: usize) -> Self {
+        Self {
+            rows: row,
+            cols: col,
+            v: (0..row * col).map(|_| rand::random()).collect(),
+        }
+    }
+
     pub(crate) fn new_row(row: &[f64]) -> Self {
         Self {
             rows: 1,

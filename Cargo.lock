@@ -626,6 +626,7 @@ name = "deeprender"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "rand",
 ]
 
 [[package]]
