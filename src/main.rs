@@ -1,4 +1,7 @@
+mod app;
 mod matrix;
+
+use app::DeepRenderApp;
 
 use self::matrix::Matrix;
 
@@ -12,12 +15,15 @@ fn sigmoid_derive(x: f64) -> f64 {
 }
 
 fn loss_fn(train: &[[f64; 3]], model: &Matrix) -> f64 {
-    train.iter().map(|sample| {
-        let input = Matrix::new_row(&sample[0..2]).hstack(&Matrix::ones(1, 1));
-        let predict = (&input * &model.t()).map(sigmoid);
-        let loss = sample[2] - predict[(0, 0)];
-        loss.powf(2.)
-    }).fold(0., |acc, cur| acc + cur)
+    train
+        .iter()
+        .map(|sample| {
+            let input = Matrix::new_row(&sample[0..2]).hstack(&Matrix::ones(1, 1));
+            let predict = (&input * &model.t()).map(sigmoid);
+            let loss = sample[2] - predict[(0, 0)];
+            loss.powf(2.)
+        })
+        .fold(0., |acc, cur| acc + cur)
 }
 
 fn learn(train: &[[f64; 3]]) {
@@ -59,7 +65,18 @@ fn learn(train: &[[f64; 3]]) {
 }
 
 fn main() {
-    let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 1.]];
+    // Log to stdout (if you run with `RUST_LOG=debug`).
+    // tracing_subscriber::fmt::init();
+
+    let native_options = eframe::NativeOptions::default();
+    eframe::run_native(
+        "DeepRender",
+        native_options,
+        Box::new(|cc| Box::new(DeepRenderApp::new(cc))),
+    )
+    .unwrap();
+
+    // let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 1.]];
     // let train = [[0., 0., 0.], [0., 1., 0.], [1., 0., 0.], [1., 1., 1.]];
-    learn(&train);
+    // learn(&train);
 }

@@ -1,5 +1,7 @@
-use std::{fmt::Display, ops::{Index, IndexMut}};
-
+use std::{
+    fmt::Display,
+    ops::{Index, IndexMut},
+};
 
 #[derive(Clone, PartialEq, Debug)]
 pub(crate) struct Matrix {
@@ -54,9 +56,7 @@ impl Matrix {
                 v[r * col + c + self.col] = other.v[r * other.col + c];
             }
         }
-        Self {
-            row, col, v,
-        }
+        Self { row, col, v }
     }
 
     pub(crate) fn eye(size: usize) -> Self {
@@ -138,7 +138,11 @@ impl std::ops::Add for Matrix {
         for (v, o) in v.iter_mut().zip(other.v.iter()) {
             *v += o;
         }
-        Self { row: self.row, col: self.col, v }
+        Self {
+            row: self.row,
+            col: self.col,
+            v,
+        }
     }
 }
 
@@ -157,10 +161,12 @@ impl std::ops::Mul for &Matrix {
         let mut v = vec![0.; self.row * rhs.col];
         for r in 0..self.row {
             for c in 0..rhs.col {
-                v[r * rhs.col + c] = self.v[r * self.col..(r + 1) * self.col].iter().zip(0..self.col).map(|(s, oi)| {
-                    s * rhs.v[oi * rhs.col + c]
-                }).fold(0., |acc, cur| acc + cur)
-            };
+                v[r * rhs.col + c] = self.v[r * self.col..(r + 1) * self.col]
+                    .iter()
+                    .zip(0..self.col)
+                    .map(|(s, oi)| s * rhs.v[oi * rhs.col + c])
+                    .fold(0., |acc, cur| acc + cur)
+            }
         }
         Matrix {
             row: self.row,
@@ -180,5 +186,5 @@ fn test_mul() {
     let aa = Matrix::new([[1., 2., 3.], [4., 5., 6.]]);
     let bb = Matrix::new([[1., 2.], [0., 1.], [0., 2.]]);
     let cc = &aa * &bb;
-    assert_eq!(cc, Matrix::new([[1., 10.], [4., 25.]]));   
+    assert_eq!(cc, Matrix::new([[1., 10.], [4., 25.]]));
 }
