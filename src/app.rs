@@ -24,7 +24,7 @@ impl DeepRenderApp {
         // let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
         Self {
             train: train.to_vec(),
-            model: Model::new(&[3, 1]),
+            model: Model::new(&[2, 1]),
             rate: 1.,
             loss_history: vec![],
         }
@@ -57,19 +57,29 @@ impl DeepRenderApp {
                 response.rect,
             );
 
+            let to_color = |weights: &Matrix, i| {
+                let weight = weights[(i, 0)];
+                if weight < 0. {
+                    Color32::from_rgb((weight.abs() * 255.).min(255.).max(0.) as u8, 0, 0)
+                } else {
+                    Color32::from_rgb(0, (weights[(i, 0)] * 255.).min(255.).max(0.) as u8, 0)
+                }
+            };
+
             for (n, weights) in self.model.weights.iter().enumerate() {
+                let x = 30. + n as f32 * 70.;
                 for i in 0..weights.rows() {
                     // let rect = Rect{ min: pos2(30., 30. + i as f32 * 30.), max: pos2(80., 50. + i as f32 * 30.) };
-                    let center = pos2(30. + n as f32 * 70., 30. + i as f32 * 30.);
+                    let center = pos2(x, 30. + i as f32 * 30.);
                     painter.circle(
                         to_screen.transform_pos(center),
                         10.,
-                        Color32::from_rgb((weights[(i, 0)] * 255.).min(255.).max(0.) as u8, 0, 0),
+                        to_color(weights, i),
                         (1., Color32::GRAY),
                     );
                 }
 
-                let center = pos2(100. + n as f32 * 70., 30. + weights.cols() as f32 / 2.);
+                let center = pos2(x + 70., 30. + weights.cols() as f32 / 2.);
                 painter.circle(
                     to_screen.transform_pos(center),
                     10.,
@@ -79,22 +89,17 @@ impl DeepRenderApp {
 
                 for i in 0..weights.rows() {
                     // let rect = Rect{ min: pos2(30., 30. + i as f32 * 30.), max: pos2(80., 50. + i as f32 * 30.) };
-                    let soure = pos2(30., 30. + i as f32 * 30.);
-                    let dest = pos2(100., 30.);
-                    painter.line_segment(
-                        [
-                            to_screen.transform_pos(soure),
-                            to_screen.transform_pos(dest),
-                        ],
-                        (
-                            1.,
-                            Color32::from_rgb(
-                                (weights[(i, 0)] * 255.).min(255.).max(0.) as u8,
-                                0,
-                                0,
-                            ),
-                        ),
-                    );
+                    let soure = pos2(x, 30. + i as f32 * 30.);
+                    for j in 0..self.model.arch[n + 1] {
+                        let dest = pos2(x + 70., 30. + j as f32 * 30.);
+                        painter.line_segment(
+                            [
+                                to_screen.transform_pos(soure),
+                                to_screen.transform_pos(dest),
+                            ],
+                            (1., to_color(weights, i)),
+                        );
+                    }
                 }
             }
         });

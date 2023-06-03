@@ -112,6 +112,10 @@ impl Matrix {
     pub(crate) fn cols(&self) -> usize {
         self.cols
     }
+
+    pub(crate) fn shape(&self) -> (usize, usize) {
+        (self.rows, self.cols)
+    }
 }
 
 impl Index<(usize, usize)> for Matrix {
