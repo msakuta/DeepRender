@@ -146,7 +146,7 @@ impl Model {
         // drop(weights);
 
         // let mut loss = (&loss * &interm2_derived).sum_col();
-        for ((l, layer_cache), weights) in layer_caches
+        for ((_l, layer_cache), weights) in layer_caches
             .iter()
             .enumerate()
             .zip(self.weights.iter_mut())

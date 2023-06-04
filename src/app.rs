@@ -15,7 +15,7 @@ pub struct DeepRenderApp {
     model: Model,
     rate: f64,
     loss_history: Vec<f64>,
-    weights_history: Vec<Matrix>,
+    weights_history: Vec<Vec<f64>>,
 }
 
 impl DeepRenderApp {
@@ -42,7 +42,7 @@ impl DeepRenderApp {
     fn learn_iter(&mut self) {
         self.model.learn(self.rate, &self.train);
         self.loss_history.push(self.model.loss(&self.train));
-        self.weights_history.push(self.model.weights[0].clone());
+        self.add_weights_history();
     }
 
     fn loss_history(&self) -> Line {
@@ -57,14 +57,27 @@ impl DeepRenderApp {
             .name("circle")
     }
 
+    fn add_weights_history(&mut self) {
+        let elems = self.model.weights[0].flat().len();
+        if self.weights_history.len() <= elems {
+            self.weights_history.resize(elems, vec![]);
+        }
+        for i in 0..elems {
+            if let Some(weights_history) = self.weights_history.get_mut(i) {
+                weights_history.push(self.model.weights[0].flat()[i]);
+            }
+        }
+    }
+
     fn weights_history(&self) -> Vec<Line> {
-        (0..self.model.weights[0].flat().len())
-            .map(|i| {
-                let points: PlotPoints = self
-                    .weights_history
+        self.weights_history
+            .iter()
+            .enumerate()
+            .map(|(i, weights_history)| {
+                let points: PlotPoints = weights_history
                     .iter()
                     .enumerate()
-                    .map(|(t, weights_history)| [t as f64, weights_history.flat()[i]])
+                    .map(|(t, v)| [t as f64, *v])
                     .collect();
                 Line::new(points)
                     .color(eframe::egui::Color32::from_rgb(
