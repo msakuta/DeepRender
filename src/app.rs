@@ -27,7 +27,7 @@ impl DeepRenderApp {
         Self {
             train: train.to_vec(),
             model: Model::new(&[2, 2, 1]),
-            rate: 0.2,
+            rate: 1.,
             loss_history: vec![],
             weights_history: vec![],
         }

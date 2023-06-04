@@ -51,7 +51,7 @@ impl Model {
 
     pub(crate) fn learn<const N: usize>(&mut self, rate: f64, train: &[[f64; N]]) {
         for sample in train {
-            self.learn_iter(rate, sample);
+            self.learn_once(rate, sample);
         }
     }
 
@@ -75,7 +75,7 @@ impl Model {
         // dbg!(&signals);
 
         // Back propagation
-        let mut loss = Matrix::new([[sample[N - 1] - signal2[(0, 0)]]]);
+        let loss = Matrix::new([[sample[N - 1] - signal2[(0, 0)]]]);
         let interm2_derived = interm2.map(sigmoid_derive);
         // println!("weights: {:?}, interm2_derived: {:?}, signal: {:?}", weights.shape(), interm2_derived.shape(), signal.shape());
         let weights = &mut self.weights[1];
@@ -93,13 +93,17 @@ impl Model {
 
         let loss1 = (&loss * &interm2_derived).sum_col();
         let interm1_derived = interm1.map(sigmoid_derive);
-        let weights = &mut self.weights[0];
-        // println!("weights: {:?}, interm1_derived: {:?}, loss1: {:?}, signal: {:?}", weights.shape(), interm1_derived.shape(), loss1.shape(), signal.shape());
+        let weights_shape = self.weights[0].shape();
+        // println!("weights1: {:?}, weights2: {:?}, interm1_derived: {:?}, loss1: {:?}, signal: {:?}",
+        //     weights_shape, self.weights[1].shape(), interm1_derived.shape(), loss1.shape(), signal.shape());
         // let signal_biased = signal.hstack(&Matrix::ones(1, 1));
-        for i in 0..weights.rows() {
-            for j in 0..weights.cols() {
-                weights[(i, j)] +=
-                    rate * loss1[(0, 0)] * signal_biased[(0, i)] * interm1_derived[(0, 0)];
+        for i in 0..weights_shape.0 {
+            for j in 0..weights_shape.1 {
+                self.weights[0][(i, j)] += rate
+                    * loss1[(0, 0)]
+                    * self.weights[1][(j, 0)]
+                    * signal_biased[(0, i)]
+                    * interm1_derived[(0, j)];
             }
         }
     }
