@@ -116,6 +116,28 @@ impl Matrix {
     pub(crate) fn shape(&self) -> (usize, usize) {
         (self.rows, self.cols)
     }
+
+    pub(crate) fn sum(&self) -> f64 {
+        self.v.iter().fold(0., |acc, cur| acc + *cur)
+    }
+
+    pub(crate) fn sum_col(&self) -> Matrix {
+        let mut v = vec![0.; self.cols];
+        for c in 0..self.cols {
+            for r in 0..self.rows {
+                v[c] += self[(r, c)];
+            }
+        }
+        Self {
+            rows: 1,
+            cols: self.cols,
+            v,
+        }
+    }
+
+    pub(crate) fn flat(&self) -> &[f64] {
+        &self.v
+    }
 }
 
 impl Index<(usize, usize)> for Matrix {

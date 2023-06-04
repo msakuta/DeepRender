@@ -15,24 +15,28 @@ pub struct DeepRenderApp {
     model: Model,
     rate: f64,
     loss_history: Vec<f64>,
+    weights_history: Vec<Matrix>,
 }
 
 impl DeepRenderApp {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 1.]];
+        // let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 1.]];
         // let train = [[0., 0., 0.], [0., 1., 0.], [1., 0., 0.], [1., 1., 1.]];
-        // let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
+        let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
+        // let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 0.], [1., 1., 1.]];
         Self {
             train: train.to_vec(),
-            model: Model::new(&[2, 1]),
-            rate: 1.,
+            model: Model::new(&[2, 2, 1]),
+            rate: 0.2,
             loss_history: vec![],
+            weights_history: vec![],
         }
     }
 
     fn learn_iter(&mut self) {
         self.model.learn(self.rate, &self.train);
         self.loss_history.push(self.model.loss(&self.train));
+        self.weights_history.push(self.model.weights[0].clone());
     }
 
     fn loss_history(&self) -> Line {
@@ -45,6 +49,26 @@ impl DeepRenderApp {
         Line::new(points)
             .color(eframe::egui::Color32::from_rgb(100, 200, 100))
             .name("circle")
+    }
+
+    fn weights_history(&self) -> Vec<Line> {
+        (0..self.model.weights[0].flat().len())
+            .map(|i| {
+                let points: PlotPoints = self
+                    .weights_history
+                    .iter()
+                    .enumerate()
+                    .map(|(t, weights_history)| [t as f64, weights_history.flat()[i]])
+                    .collect();
+                Line::new(points)
+                    .color(eframe::egui::Color32::from_rgb(
+                        (i % 2 * 200) as u8,
+                        (i % 4 * 200) as u8,
+                        (i % 8 * 100) as u8,
+                    ))
+                    .name("circle")
+            })
+            .collect()
     }
 
     fn paint_graph(&self, ui: &mut Ui) {
@@ -133,6 +157,9 @@ impl eframe::App for DeepRenderApp {
         eframe::egui::CentralPanel::default().show(ctx, |ui| {
             let plot = Plot::new("plot");
             plot.show(ui, |plot_ui| {
+                for line in self.weights_history() {
+                    plot_ui.line(line)
+                }
                 plot_ui.line(self.loss_history());
             })
         });
