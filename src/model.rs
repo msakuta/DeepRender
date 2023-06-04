@@ -1,10 +1,12 @@
 use std::fmt::Display;
 
-use crate::{matrix::Matrix, sigmoid, sigmoid_derive};
+use crate::matrix::Matrix;
 
 pub(crate) struct Model {
     pub arch: Vec<usize>,
     pub weights: Vec<Matrix>,
+    pub activation: fn(f64) -> f64,
+    pub activation_derive: fn(f64) -> f64,
 }
 
 impl Display for Model {
@@ -16,7 +18,11 @@ impl Display for Model {
 }
 
 impl Model {
-    pub(crate) fn new(shapes: &[usize]) -> Self {
+    pub(crate) fn new(
+        shapes: &[usize],
+        activation: fn(f64) -> f64,
+        activation_derive: fn(f64) -> f64,
+    ) -> Self {
         Self {
             arch: shapes.to_vec(),
             weights: shapes
@@ -25,6 +31,8 @@ impl Model {
                 .zip(shapes.iter().skip(1))
                 .map(|(n, m)| Matrix::rand(*n + 1, *m))
                 .collect(),
+            activation,
+            activation_derive,
         }
     }
 
@@ -44,7 +52,7 @@ impl Model {
         for weights in &self.weights {
             let signal = input.hstack(&Matrix::ones(1, 1));
             let interm = &signal * &weights;
-            input = interm.map(sigmoid);
+            input = interm.map(self.activation);
         }
         input
     }
@@ -55,6 +63,7 @@ impl Model {
         }
     }
 
+    #[allow(dead_code)]
     fn learn_once<const N: usize>(&mut self, rate: f64, sample: &[f64; N]) {
         let input = Matrix::new_row(&sample[0..N - 1]);
         let signal = input.clone();
@@ -63,20 +72,20 @@ impl Model {
         let signal_biased = signal.hstack(&Matrix::ones(1, 1));
         let interm1 = &signal_biased * weights;
         // println!("signal: {:?}, weights: {:?}, shape: {:?}", signal_biased.shape(), weights.shape(), interm1.shape());
-        let signal1 = interm1.map(sigmoid);
+        let signal1 = interm1.map(self.activation);
         drop(weights);
 
         let weights = &self.weights[1];
         let signal1_biased = signal1.hstack(&Matrix::ones(1, 1));
         let interm2 = &signal1_biased * weights;
         // println!("signal: {:?}, weights: {:?}, shape: {:?}", signal_biased.shape(), weights.shape(), interm1.shape());
-        let signal2 = interm2.map(sigmoid);
+        let signal2 = interm2.map(self.activation);
         drop(weights);
         // dbg!(&signals);
 
         // Back propagation
         let loss = Matrix::new([[sample[N - 1] - signal2[(0, 0)]]]);
-        let interm2_derived = interm2.map(sigmoid_derive);
+        let interm2_derived = interm2.map(self.activation_derive);
         // println!("weights: {:?}, interm2_derived: {:?}, signal: {:?}", weights.shape(), interm2_derived.shape(), signal.shape());
         let weights = &mut self.weights[1];
         // println!("weights: {:?}, interm2_derived: {:?}, signal: {:?}", weights.shape(), interm2_derived.shape(), signal.shape());
@@ -92,7 +101,7 @@ impl Model {
         drop(weights);
 
         let loss1 = &(&loss * &interm2_derived).sum_col() * &self.weights[1].t();
-        let interm1_derived = interm1.map(sigmoid_derive);
+        let interm1_derived = interm1.map(self.activation_derive);
         let weights_shape = self.weights[0].shape();
         // println!("weights1: {:?}, weights2: {:?}, interm1_derived: {:?}, loss1: {:?}, signal: {:?}",
         //     weights_shape, self.weights[1].shape(), interm1_derived.shape(), loss1.shape(), signal.shape());
@@ -120,7 +129,7 @@ impl Model {
             let signal_biased = signal.hstack(&Matrix::ones(1, 1));
             let interm = &signal_biased * &weights;
             // println!("signal: {:?}, weights: {:?}, shape: {:?}", signal_biased.shape(), weights.shape(), interm.shape());
-            signal = interm.map(sigmoid);
+            signal = interm.map(self.activation);
             layer_caches.push(LayerCache {
                 signal: signal_biased,
                 interm,
@@ -152,7 +161,7 @@ impl Model {
             .zip(self.weights.iter_mut())
             .rev()
         {
-            let interm_derived = layer_cache.interm.map(sigmoid_derive);
+            let interm_derived = layer_cache.interm.map(self.activation_derive);
             // println!("weights: {:?}, interm_derived: {:?}, signal: {:?}", weights.shape(), interm_derived.shape(), signal.shape());
             // let diff = weights as &Matrix * &interm_derived.t();
             // println!("{weights} * {interm_derived} = {diff}");

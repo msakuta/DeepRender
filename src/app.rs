@@ -8,7 +8,7 @@ use eframe::{
     epaint::{pos2, Color32, Pos2, Rect},
 };
 
-use crate::{matrix::Matrix, model::Model};
+use crate::{matrix::Matrix, model::Model, sigmoid, sigmoid_derive};
 
 pub struct DeepRenderApp {
     train: Vec<[f64; 3]>,
@@ -26,7 +26,7 @@ impl DeepRenderApp {
         // let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 0.], [1., 1., 1.]];
         Self {
             train: train.to_vec(),
-            model: Model::new(&[2, 2, 1]),
+            model: Model::new(&[2, 2, 1], sigmoid, sigmoid_derive),
             rate: 1.,
             loss_history: vec![],
             weights_history: vec![],
@@ -34,7 +34,7 @@ impl DeepRenderApp {
     }
 
     fn reset(&mut self) {
-        self.model = Model::new(&[2, 2, 1]);
+        self.model = Model::new(&[2, 2, 1], sigmoid, sigmoid_derive);
         self.loss_history = vec![];
         self.weights_history = vec![];
     }
