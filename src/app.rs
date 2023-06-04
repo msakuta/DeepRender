@@ -8,14 +8,16 @@ use eframe::{
     epaint::{pos2, Color32, Pos2, Rect},
 };
 
-use crate::{matrix::Matrix, model::Model, sigmoid, sigmoid_derive};
+use crate::{activation::ActivationFn, matrix::Matrix, model::Model};
 
 pub struct DeepRenderApp {
     train: Vec<[f64; 3]>,
+    arch: Vec<usize>,
     model: Model,
     rate: f64,
     loss_history: Vec<f64>,
     weights_history: Vec<Vec<f64>>,
+    activation_fn: ActivationFn,
 }
 
 impl DeepRenderApp {
@@ -24,17 +26,26 @@ impl DeepRenderApp {
         // let train = [[0., 0., 0.], [0., 1., 0.], [1., 0., 0.], [1., 1., 1.]];
         let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
         // let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 0.], [1., 1., 1.]];
+        let arch = vec![2, 2, 1];
+        let activation_fn = ActivationFn::Sigmoid;
+        let model = Model::new(&arch, activation_fn.get(), activation_fn.get_derive());
         Self {
             train: train.to_vec(),
-            model: Model::new(&[2, 2, 1], sigmoid, sigmoid_derive),
+            arch,
+            model,
             rate: 1.,
             loss_history: vec![],
             weights_history: vec![],
+            activation_fn,
         }
     }
 
     fn reset(&mut self) {
-        self.model = Model::new(&[2, 2, 1], sigmoid, sigmoid_derive);
+        self.model = Model::new(
+            &self.arch,
+            self.activation_fn.get(),
+            self.activation_fn.get_derive(),
+        );
         self.loss_history = vec![];
         self.weights_history = vec![];
     }
@@ -147,6 +158,32 @@ impl DeepRenderApp {
             }
         });
     }
+
+    fn ui_panel(&mut self, ui: &mut Ui) {
+        if ui.button("Reset").clicked() {
+            self.reset();
+        }
+        ui.horizontal(|ui| {
+            ui.label("Activation fn:");
+            ui.radio_value(&mut self.activation_fn, ActivationFn::Sigmoid, "Sigmoid");
+            ui.radio_value(&mut self.activation_fn, ActivationFn::Relu, "Relu");
+        });
+
+        ui.group(|ui| {
+            ui.label("Architecture:");
+            ui.horizontal(|ui| {
+                ui.label("Hidden layer:");
+                ui.add(egui::Slider::new(&mut self.arch[1], 1..=10));
+            });
+        });
+
+        ui.label(format!("Loss: {}", self.model.loss(&self.train)));
+        ui.label(format!("Model:\n{}", self.model));
+        for sample in &self.train {
+            let predict = self.model.predict(sample);
+            ui.label(format!("{} -> {}", Matrix::new_row(&sample[0..2]), predict));
+        }
+    }
 }
 
 impl eframe::App for DeepRenderApp {
@@ -157,17 +194,7 @@ impl eframe::App for DeepRenderApp {
 
         eframe::egui::SidePanel::right("side_panel")
             .min_width(200.)
-            .show(ctx, |ui| {
-                if ui.button("Reset").clicked() {
-                    self.reset();
-                }
-                ui.label(format!("Loss: {}", self.model.loss(&self.train)));
-                ui.label(format!("Model:\n{}", self.model));
-                for sample in &self.train {
-                    let predict = self.model.predict(sample);
-                    ui.label(format!("{} -> {}", Matrix::new_row(&sample[0..2]), predict));
-                }
-            });
+            .show(ctx, |ui| self.ui_panel(ui));
 
         egui::TopBottomPanel::bottom("graph")
             .resizable(true)

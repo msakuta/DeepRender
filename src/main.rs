@@ -1,17 +1,9 @@
+mod activation;
 mod app;
 mod matrix;
 mod model;
 
 use app::DeepRenderApp;
-
-fn sigmoid(x: f64) -> f64 {
-    1. / (1. + (-x).exp())
-}
-
-fn sigmoid_derive(x: f64) -> f64 {
-    let sigmoid_x = sigmoid(x);
-    (1. - sigmoid_x) * sigmoid_x
-}
 
 fn main() {
     // Log to stdout (if you run with `RUST_LOG=debug`).
