@@ -36,19 +36,19 @@ impl Model {
         }
     }
 
-    pub(crate) fn loss(&self, train: &[[f64; 3]]) -> f64 {
+    pub(crate) fn loss(&self, train: &Matrix) -> f64 {
         train
-            .iter()
+            .iter_rows()
             .map(|sample| {
-                let loss = sample[2] - self.predict(sample)[(0, 0)];
+                let loss = sample[sample.len() - 1] - self.predict(sample)[(0, 0)];
                 loss.powf(2.)
             })
             .fold(0., |acc, cur| acc + cur)
             / 2.
     }
 
-    pub(crate) fn predict(&self, sample: &[f64; 3]) -> Matrix {
-        let mut input = Matrix::new_row(&sample[0..2]);
+    pub(crate) fn predict(&self, sample: &[f64]) -> Matrix {
+        let mut input = Matrix::new_row(&sample[0..self.arch[0]]);
         for weights in &self.weights {
             let signal = input.hstack(&Matrix::ones(1, 1));
             let interm = &signal * &weights;
@@ -57,15 +57,15 @@ impl Model {
         input
     }
 
-    pub(crate) fn learn<const N: usize>(&mut self, rate: f64, train: &[[f64; N]]) {
-        for sample in train {
-            self.learn_iter(rate, sample);
+    pub(crate) fn learn(&mut self, rate: f64, train: &Matrix) {
+        for row in 0..train.rows() {
+            self.learn_iter(rate, train.row(row));
         }
     }
 
     #[allow(dead_code)]
-    fn learn_once<const N: usize>(&mut self, rate: f64, sample: &[f64; N]) {
-        let input = Matrix::new_row(&sample[0..N - 1]);
+    fn learn_once(&mut self, rate: f64, sample: &[f64]) {
+        let input = Matrix::new_row(&sample[0..sample.len() - 1]);
         let signal = input.clone();
 
         let weights = &self.weights[0];
@@ -84,7 +84,7 @@ impl Model {
         // dbg!(&signals);
 
         // Back propagation
-        let loss = Matrix::new([[sample[N - 1] - signal2[(0, 0)]]]);
+        let loss = Matrix::new([[sample[sample.len() - 1] - signal2[(0, 0)]]]);
         let interm2_derived = interm2.map(self.activation_derive);
         // println!("weights: {:?}, interm2_derived: {:?}, signal: {:?}", weights.shape(), interm2_derived.shape(), signal.shape());
         let weights = &mut self.weights[1];
@@ -114,8 +114,8 @@ impl Model {
         }
     }
 
-    fn learn_iter<const N: usize>(&mut self, rate: f64, sample: &[f64; N]) {
-        let input = Matrix::new_row(&sample[0..N - 1]);
+    fn learn_iter(&mut self, rate: f64, sample: &[f64]) {
+        let input = Matrix::new_row(&sample[0..sample.len() - 1]);
 
         struct LayerCache {
             signal: Matrix,
@@ -137,7 +137,7 @@ impl Model {
         }
 
         // Back propagation
-        let mut loss = Matrix::new([[sample[N - 1] - signal[(0, 0)]]]);
+        let mut loss = Matrix::new([[sample[sample.len() - 1] - signal[(0, 0)]]]);
         // let last_layer = layer_caches.last().unwrap();
         // let interm2_derived = last_layer.interm.map(sigmoid_derive);
         // // println!("weights: {:?}, interm2_derived: {:?}, signal: {:?}", weights.shape(), interm2_derived.shape(), signal.shape());

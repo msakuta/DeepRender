@@ -19,6 +19,14 @@ impl Matrix {
         }
     }
 
+    pub(crate) fn from_slice<const C: usize>(m: &[[f64; C]]) -> Self {
+        Self {
+            rows: m.len(),
+            cols: C,
+            v: m.iter().flatten().copied().collect(),
+        }
+    }
+
     pub(crate) fn zeros(row: usize, col: usize) -> Self {
         Self {
             rows: row,
@@ -111,6 +119,14 @@ impl Matrix {
 
     pub(crate) fn cols(&self) -> usize {
         self.cols
+    }
+
+    pub(crate) fn row(&self, r: usize) -> &[f64] {
+        &self.v[r * self.cols..(r + 1) * self.cols]
+    }
+
+    pub(crate) fn iter_rows(&self) -> impl Iterator<Item = &[f64]> {
+        (0..self.rows).map(|r| &self.v[r * self.cols..(r + 1) * self.cols])
     }
 
     pub(crate) fn shape(&self) -> (usize, usize) {

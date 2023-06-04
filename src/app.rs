@@ -8,11 +8,12 @@ use eframe::{
     epaint::{pos2, Color32, Pos2, Rect},
 };
 
-use crate::{activation::ActivationFn, matrix::Matrix, model::Model};
+use crate::{activation::ActivationFn, fit_model::FitModel, matrix::Matrix, model::Model};
 
 pub struct DeepRenderApp {
-    train: Vec<[f64; 3]>,
-    arch: Vec<usize>,
+    fit_model: FitModel,
+    train: Matrix,
+    hidden_nodes: usize,
     model: Model,
     rate: f64,
     loss_history: Vec<f64>,
@@ -22,16 +23,15 @@ pub struct DeepRenderApp {
 
 impl DeepRenderApp {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        // let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 1.]];
-        // let train = [[0., 0., 0.], [0., 1., 0.], [1., 0., 0.], [1., 1., 1.]];
-        let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
-        // let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 0.], [1., 1., 1.]];
-        let arch = vec![2, 2, 1];
+        let fit_model = FitModel::Xor;
+        let train = fit_model.train_data();
+        let arch = vec![train.cols() - 1, 2, 1];
         let activation_fn = ActivationFn::Sigmoid;
         let model = Model::new(&arch, activation_fn.get(), activation_fn.get_derive());
         Self {
-            train: train.to_vec(),
-            arch,
+            fit_model: FitModel::Xor,
+            train,
+            hidden_nodes: 2,
             model,
             rate: 1.,
             loss_history: vec![],
@@ -41,8 +41,10 @@ impl DeepRenderApp {
     }
 
     fn reset(&mut self) {
+        self.train = self.fit_model.train_data();
+        let arch = vec![self.train.cols() - 1, self.hidden_nodes, 1];
         self.model = Model::new(
-            &self.arch,
+            &arch,
             self.activation_fn.get(),
             self.activation_fn.get_derive(),
         );
@@ -163,26 +165,55 @@ impl DeepRenderApp {
         if ui.button("Reset").clicked() {
             self.reset();
         }
+
+        ui.horizontal(|ui| {
+            ui.label("Fit model:");
+            ui.radio_value(&mut self.fit_model, FitModel::Xor, "Xor");
+            ui.radio_value(&mut self.fit_model, FitModel::Sine, "Sine");
+        });
+
         ui.horizontal(|ui| {
             ui.label("Activation fn:");
             ui.radio_value(&mut self.activation_fn, ActivationFn::Sigmoid, "Sigmoid");
-            ui.radio_value(&mut self.activation_fn, ActivationFn::Relu, "Relu");
+            ui.radio_value(&mut self.activation_fn, ActivationFn::Relu, "ReLU");
         });
 
         ui.group(|ui| {
             ui.label("Architecture:");
             ui.horizontal(|ui| {
                 ui.label("Hidden layer:");
-                ui.add(egui::Slider::new(&mut self.arch[1], 1..=10));
+                ui.add(egui::Slider::new(&mut self.hidden_nodes, 1..=10));
             });
         });
 
         ui.label(format!("Loss: {}", self.model.loss(&self.train)));
         ui.label(format!("Model:\n{}", self.model));
-        for sample in &self.train {
+        for sample in self.train.iter_rows() {
             let predict = self.model.predict(sample);
             ui.label(format!("{} -> {}", Matrix::new_row(&sample[0..2]), predict));
         }
+    }
+
+    fn func_plot(&self, ui: &mut Ui) {
+        let plot = Plot::new("plot");
+        plot.legend(Legend::default()).show(ui, |plot_ui| {
+            let points: PlotPoints = self
+                .train
+                .iter_rows()
+                .map(|sample| [sample[0], sample[1]])
+                .collect();
+            let line = Line::new(points)
+                .color(eframe::egui::Color32::from_rgb(0, 0, 255))
+                .name("Training");
+            plot_ui.line(line);
+            let points: PlotPoints = self
+                .train
+                .iter_rows()
+                .map(|sample| [sample[0], self.model.predict(sample)[(0, 0)]])
+                .collect();
+            let line_predict = Line::new(points).name("Predicted");
+            plot_ui.line(line_predict);
+        });
     }
 }
 
@@ -206,7 +237,7 @@ impl eframe::App for DeepRenderApp {
         egui::TopBottomPanel::bottom("weight_plot")
             .resizable(true)
             .min_height(100.)
-            .default_height(250.)
+            .default_height(125.)
             .show(ctx, |ui| {
                 let plot = Plot::new("plot");
                 plot.legend(Legend::default()).show(ui, |plot_ui| {
@@ -215,6 +246,14 @@ impl eframe::App for DeepRenderApp {
                     }
                 });
             });
+
+        if self.train.cols() == 2 {
+            egui::TopBottomPanel::bottom("func_plot")
+                .resizable(true)
+                .min_height(100.)
+                .default_height(125.)
+                .show(ctx, |ui| self.func_plot(ui));
+        }
 
         eframe::egui::CentralPanel::default().show(ctx, |ui| {
             let plot = Plot::new("plot");
