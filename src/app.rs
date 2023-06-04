@@ -33,6 +33,12 @@ impl DeepRenderApp {
         }
     }
 
+    fn reset(&mut self) {
+        self.model = Model::new(&[2, 2, 1]);
+        self.loss_history = vec![];
+        self.weights_history = vec![];
+    }
+
     fn learn_iter(&mut self) {
         self.model.learn(self.rate, &self.train);
         self.loss_history.push(self.model.loss(&self.train));
@@ -139,6 +145,9 @@ impl eframe::App for DeepRenderApp {
         eframe::egui::SidePanel::right("side_panel")
             .min_width(200.)
             .show(ctx, |ui| {
+                if ui.button("Reset").clicked() {
+                    self.reset();
+                }
                 ui.label(format!("Loss: {}", self.model.loss(&self.train)));
                 ui.label(format!("Model:\n{}", self.model));
                 for sample in &self.train {

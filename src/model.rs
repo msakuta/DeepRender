@@ -51,7 +51,7 @@ impl Model {
 
     pub(crate) fn learn<const N: usize>(&mut self, rate: f64, train: &[[f64; N]]) {
         for sample in train {
-            self.learn_once(rate, sample);
+            self.learn_iter(rate, sample);
         }
     }
 
@@ -91,7 +91,7 @@ impl Model {
         }
         drop(weights);
 
-        let loss1 = (&loss * &interm2_derived).sum_col();
+        let loss1 = &(&loss * &interm2_derived).sum_col() * &self.weights[1].t();
         let interm1_derived = interm1.map(sigmoid_derive);
         let weights_shape = self.weights[0].shape();
         // println!("weights1: {:?}, weights2: {:?}, interm1_derived: {:?}, loss1: {:?}, signal: {:?}",
@@ -99,11 +99,8 @@ impl Model {
         // let signal_biased = signal.hstack(&Matrix::ones(1, 1));
         for i in 0..weights_shape.0 {
             for j in 0..weights_shape.1 {
-                self.weights[0][(i, j)] += rate
-                    * loss1[(0, 0)]
-                    * self.weights[1][(j, 0)]
-                    * signal_biased[(0, i)]
-                    * interm1_derived[(0, j)];
+                self.weights[0][(i, j)] +=
+                    rate * loss1[(0, j)] * signal_biased[(0, i)] * interm1_derived[(0, j)];
             }
         }
     }
@@ -111,41 +108,71 @@ impl Model {
     fn learn_iter<const N: usize>(&mut self, rate: f64, sample: &[f64; N]) {
         let input = Matrix::new_row(&sample[0..N - 1]);
 
+        struct LayerCache {
+            signal: Matrix,
+            interm: Matrix,
+        }
+
         // Forward propagation
         let mut signal = input.clone();
-        let mut signals = vec![];
-        let mut interms = vec![];
-        for weights in &self.weights {
+        let mut layer_caches = vec![];
+        for weights in self.weights.iter() {
             let signal_biased = signal.hstack(&Matrix::ones(1, 1));
             let interm = &signal_biased * &weights;
             // println!("signal: {:?}, weights: {:?}, shape: {:?}", signal_biased.shape(), weights.shape(), interm.shape());
             signal = interm.map(sigmoid);
-            signals.push(signal_biased);
-            interms.push(interm);
+            layer_caches.push(LayerCache {
+                signal: signal_biased,
+                interm,
+            });
         }
 
         // Back propagation
         let mut loss = Matrix::new([[sample[N - 1] - signal[(0, 0)]]]);
-        for ((interm, signal), weights) in interms
+        // let last_layer = layer_caches.last().unwrap();
+        // let interm2_derived = last_layer.interm.map(sigmoid_derive);
+        // // println!("weights: {:?}, interm2_derived: {:?}, signal: {:?}", weights.shape(), interm2_derived.shape(), signal.shape());
+        // let weights = self.weights.last_mut().unwrap();
+        // // println!("weights: {:?}, interm2_derived: {:?}, signal: {:?}", weights.shape(), interm2_derived.shape(), signal.shape());
+        // // println!("{weights} * {interm2_derived} = {diff}");
+        // let signal1_biased = &last_layer.signal;
+        // // println!("weights: {weights} signal1_biased: {signal1_biased}, diff: {diff}, interm2_derived: {interm2_derived}, loss: {loss}");
+        // for i in 0..weights.rows() {
+        //     for j in 0..weights.cols() {
+        //         weights[(i, j)] +=
+        //             rate * loss[(0, j)] * signal1_biased[(0, i)] * interm2_derived[(0, 0)];
+        //     }
+        // }
+        // drop(weights);
+
+        // let mut loss = (&loss * &interm2_derived).sum_col();
+        for ((l, layer_cache), weights) in layer_caches
             .iter()
+            .enumerate()
+            .zip(self.weights.iter_mut())
             .rev()
-            .zip(signals.iter().rev())
-            .zip(self.weights.iter_mut().rev())
         {
-            let interm_derived = interm.map(sigmoid_derive);
+            let interm_derived = layer_cache.interm.map(sigmoid_derive);
             // println!("weights: {:?}, interm_derived: {:?}, signal: {:?}", weights.shape(), interm_derived.shape(), signal.shape());
             // let diff = weights as &Matrix * &interm_derived.t();
-            // println!("weights: {:?}, interm_derived: {:?}, signal: {:?}, loss: {:?}", weights.shape(), interm_derived.shape(), signal.shape(), loss.shape());
             // println!("{weights} * {interm_derived} = {diff}");
-            let input_biased = signal; //.hstack(&Matrix::ones(1, 1));
-                                       // println!("weights: {weights} input_biased: {input_biased}, diff: {diff}, interm_derived: {interm_derived}, loss: {loss}");
-            for i in 0..weights.rows() {
-                for j in 0..weights.cols() {
+            let weights_shape = weights.shape();
+            // println!(
+            //     "layer {l}: weights: {:?}, interm_derived: {:?}, signal: {:?}, loss: {:?}",
+            //     weights_shape,
+            //     interm_derived.shape(),
+            //     layer_cache.signal.shape(),
+            //     loss.shape()
+            // );
+            let signal_biased = &layer_cache.signal;
+            // println!("weights: {weights} signal_biased: {signal_biased}, diff: {diff}, interm_derived: {interm_derived}, loss: {loss}");
+            for i in 0..weights_shape.0 {
+                for j in 0..weights_shape.1 {
                     weights[(i, j)] +=
-                        rate * loss[(0, 0)] * input_biased[(0, i)] * interm_derived[(0, 0)];
+                        rate * loss[(0, j)] * signal_biased[(0, i)] * interm_derived[(0, j)];
                 }
             }
-            loss = (&loss.t() * &interm_derived).sum_col();
+            loss = &(&loss.t() * &interm_derived).sum_col() * &weights.t();
         }
     }
 }
