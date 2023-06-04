@@ -13,6 +13,7 @@ use crate::{activation::ActivationFn, fit_model::FitModel, matrix::Matrix, model
 pub struct DeepRenderApp {
     fit_model: FitModel,
     train: Matrix,
+    hidden_layers: usize,
     hidden_nodes: usize,
     model: Model,
     rate: f64,
@@ -25,12 +26,23 @@ impl DeepRenderApp {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let fit_model = FitModel::Xor;
         let train = fit_model.train_data();
-        let arch = vec![train.cols() - 1, 2, 1];
+        let hidden_layers = 1;
+        let mut arch = vec![train.cols() - 1];
+        for _ in 0..hidden_layers {
+            arch.push(2);
+        }
+        arch.push(1);
         let activation_fn = ActivationFn::Sigmoid;
-        let model = Model::new(&arch, activation_fn.get(), activation_fn.get_derive());
+        let model = Model::new(
+            &arch,
+            activation_fn.get(),
+            activation_fn.get_derive(),
+            activation_fn.random_scale(),
+        );
         Self {
             fit_model: FitModel::Xor,
             train,
+            hidden_layers,
             hidden_nodes: 2,
             model,
             rate: 1.,
@@ -42,11 +54,16 @@ impl DeepRenderApp {
 
     fn reset(&mut self) {
         self.train = self.fit_model.train_data();
-        let arch = vec![self.train.cols() - 1, self.hidden_nodes, 1];
+        let mut arch = vec![self.train.cols() - 1];
+        for _ in 0..self.hidden_layers {
+            arch.push(self.hidden_nodes);
+        }
+        arch.push(1);
         self.model = Model::new(
             &arch,
             self.activation_fn.get(),
             self.activation_fn.get_derive(),
+            self.activation_fn.random_scale(),
         );
         self.loss_history = vec![];
         self.weights_history = vec![];
@@ -180,8 +197,14 @@ impl DeepRenderApp {
 
         ui.group(|ui| {
             ui.label("Architecture:");
+
             ui.horizontal(|ui| {
-                ui.label("Hidden layer:");
+                ui.label("Hidden layers:");
+                ui.add(egui::Slider::new(&mut self.hidden_layers, 1..=5));
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Hidden nodes:");
                 ui.add(egui::Slider::new(&mut self.hidden_nodes, 1..=10));
             });
         });

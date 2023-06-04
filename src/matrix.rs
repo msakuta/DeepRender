@@ -48,7 +48,7 @@ impl Matrix {
             rows: row,
             cols: col,
             v: (0..row * col)
-                .map(|_| rand::random::<f64>() * 10. - 1.)
+                .map(|_| rand::random::<f64>() * 2. - 1.)
                 .collect(),
         }
     }
@@ -155,6 +155,14 @@ impl Matrix {
 
     pub(crate) fn flat(&self) -> &[f64] {
         &self.v
+    }
+
+    pub(crate) fn scale(&self, f: f64) -> Matrix {
+        Self {
+            rows: self.rows,
+            cols: self.cols,
+            v: self.v.iter().map(|v| f * *v).collect(),
+        }
     }
 }
 

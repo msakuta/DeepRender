@@ -22,6 +22,7 @@ impl Model {
         shapes: &[usize],
         activation: fn(f64) -> f64,
         activation_derive: fn(f64) -> f64,
+        random_scale: f64,
     ) -> Self {
         Self {
             arch: shapes.to_vec(),
@@ -29,7 +30,7 @@ impl Model {
                 .iter()
                 .take(shapes.len() - 1)
                 .zip(shapes.iter().skip(1))
-                .map(|(n, m)| Matrix::rand(*n + 1, *m))
+                .map(|(n, m)| Matrix::rand(*n + 1, *m).scale(random_scale))
                 .collect(),
             activation,
             activation_derive,

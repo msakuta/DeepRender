@@ -17,8 +17,8 @@ impl FitModel {
                 Matrix::new([[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]])
             }
             Self::Sine => {
-                let data: Vec<_> = (-10..=10)
-                    .map(|f| [f as f64, (f as f64 / 2.).sin() * 0.5 + 0.5])
+                let data: Vec<_> = (-20..=20)
+                    .map(|f| [f as f64, (f as f64 / 4.).sin() * 0.5 + 0.5])
                     .collect();
                 Matrix::from_slice(&data)
             }
