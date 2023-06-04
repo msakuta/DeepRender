@@ -1,7 +1,7 @@
 use eframe::{
     egui::{
         self,
-        plot::{Line, PlotPoints},
+        plot::{Legend, Line, PlotPoints},
         widgets::plot::Plot,
         Frame, Ui,
     },
@@ -54,7 +54,7 @@ impl DeepRenderApp {
             .collect();
         Line::new(points)
             .color(eframe::egui::Color32::from_rgb(100, 200, 100))
-            .name("circle")
+            .name("Loss")
     }
 
     fn add_weights_history(&mut self) {
@@ -85,7 +85,7 @@ impl DeepRenderApp {
                         (i % 4 * 200) as u8,
                         (i % 8 * 100) as u8,
                     ))
-                    .name("circle")
+                    .name(format!("weights[{}, {}]", i / 2, i % 2))
             })
             .collect()
     }
@@ -176,12 +176,22 @@ impl eframe::App for DeepRenderApp {
                 self.paint_graph(ui);
             });
 
+        egui::TopBottomPanel::bottom("weight_plot")
+            .resizable(true)
+            .min_height(100.)
+            .default_height(250.)
+            .show(ctx, |ui| {
+                let plot = Plot::new("plot");
+                plot.legend(Legend::default()).show(ui, |plot_ui| {
+                    for line in self.weights_history() {
+                        plot_ui.line(line)
+                    }
+                });
+            });
+
         eframe::egui::CentralPanel::default().show(ctx, |ui| {
             let plot = Plot::new("plot");
-            plot.show(ui, |plot_ui| {
-                for line in self.weights_history() {
-                    plot_ui.line(line)
-                }
+            plot.legend(Legend::default()).show(ui, |plot_ui| {
                 plot_ui.line(self.loss_history());
             })
         });
