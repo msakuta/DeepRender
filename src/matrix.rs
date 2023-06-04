@@ -47,7 +47,9 @@ impl Matrix {
         Self {
             rows: row,
             cols: col,
-            v: (0..row * col).map(|_| rand::random()).collect(),
+            v: (0..row * col)
+                .map(|_| rand::random::<f64>() * 10. - 1.)
+                .collect(),
         }
     }
 

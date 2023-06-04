@@ -186,6 +186,11 @@ impl DeepRenderApp {
             });
         });
 
+        ui.horizontal(|ui| {
+            ui.label("Descent rate:");
+            ui.add(egui::Slider::new(&mut self.rate, 0.01..=1.));
+        });
+
         ui.label(format!("Loss: {}", self.model.loss(&self.train)));
         ui.label(format!("Model:\n{}", self.model));
         for sample in self.train.iter_rows() {
