@@ -45,7 +45,7 @@ impl DeepRenderApp {
             hidden_layers,
             hidden_nodes: 2,
             model,
-            rate: 1.,
+            rate: 0.,
             loss_history: vec![],
             weights_history: vec![],
             activation_fn,
@@ -70,7 +70,7 @@ impl DeepRenderApp {
     }
 
     fn learn_iter(&mut self) {
-        self.model.learn(self.rate, &self.train);
+        self.model.learn((10.0f64).powf(self.rate), &self.train);
         self.loss_history.push(self.model.loss(&self.train));
         self.add_weights_history();
     }
@@ -209,9 +209,12 @@ impl DeepRenderApp {
             });
         });
 
-        ui.horizontal(|ui| {
-            ui.label("Descent rate:");
-            ui.add(egui::Slider::new(&mut self.rate, 0.01..=1.));
+        ui.group(|ui| {
+            ui.horizontal(|ui| {
+                ui.label("Descent rate log10:");
+                ui.add(egui::Slider::new(&mut self.rate, -10.0..=0.));
+            });
+            ui.label(format!("Descent rate: {}", (10.0f64).powf(self.rate)));
         });
 
         ui.label(format!("Loss: {}", self.model.loss(&self.train)));

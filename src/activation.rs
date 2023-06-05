@@ -43,7 +43,7 @@ impl ActivationFn {
     pub(crate) fn random_scale(&self) -> f64 {
         match self {
             Self::Sigmoid => 1.,
-            Self::Relu => 0.5, // ReLU tends to be very sensitive
+            Self::Relu => 1.,
         }
     }
 }
