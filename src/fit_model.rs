@@ -4,6 +4,7 @@ use crate::matrix::Matrix;
 pub(crate) enum FitModel {
     Xor,
     Sine,
+    Image,
 }
 
 impl FitModel {
@@ -20,6 +21,27 @@ impl FitModel {
                 let data: Vec<_> = (-20..=20)
                     .map(|f| [f as f64, (f as f64 / 4.).sin() * 0.5 + 0.5])
                     .collect();
+                Matrix::from_slice(&data)
+            }
+            Self::Image => {
+                let data: Vec<_> = (-10..=10)
+                    .map(|y| {
+                        (-10..=10).map(move |x| {
+                            [
+                                x as f64,
+                                y as f64,
+                                (x as f64 / 4.).sin() * (y as f64 / 4.).sin() * 0.5 + 0.5,
+                            ]
+                        })
+                    })
+                    .flatten()
+                    .collect();
+                dbg!(
+                    data.iter()
+                        .fold(0., |acc, cur| if acc < cur[2] { cur[2] } else { acc }),
+                    data.iter()
+                        .fold(0., |acc, cur| if acc < cur[2] { acc } else { cur[2] })
+                );
                 Matrix::from_slice(&data)
             }
         }

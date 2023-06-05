@@ -9,7 +9,7 @@ use eframe::{
 };
 
 use crate::{
-    activation::ActivationFn, fit_model::FitModel, matrix::Matrix, model::Model,
+    activation::ActivationFn, bg_image::BgImage, fit_model::FitModel, matrix::Matrix, model::Model,
     optimizer::OptimizerType,
 };
 
@@ -24,6 +24,10 @@ pub struct DeepRenderApp {
     weights_history: Vec<Vec<f64>>,
     activation_fn: ActivationFn,
     optimizer: OptimizerType,
+
+    // Widgets
+    img: BgImage,
+    img_predict: BgImage,
 }
 
 impl DeepRenderApp {
@@ -50,6 +54,8 @@ impl DeepRenderApp {
             weights_history: vec![],
             activation_fn,
             optimizer,
+            img: BgImage::new(),
+            img_predict: BgImage::new(),
         }
     }
 
@@ -183,6 +189,7 @@ impl DeepRenderApp {
             ui.label("Fit model:");
             ui.radio_value(&mut self.fit_model, FitModel::Xor, "Xor");
             ui.radio_value(&mut self.fit_model, FitModel::Sine, "Sine");
+            ui.radio_value(&mut self.fit_model, FitModel::Image, "Image");
         });
 
         ui.horizontal(|ui| {
@@ -249,6 +256,56 @@ impl DeepRenderApp {
             plot_ui.line(line_predict);
         });
     }
+
+    fn image_plot(&mut self, ui: &mut Ui) {
+        Frame::canvas(ui.style()).show(ui, |ui| {
+            let (response, painter) =
+                ui.allocate_painter(ui.available_size(), egui::Sense::hover());
+
+            if self.train.rows() != 21 * 21 {
+                return;
+            }
+
+            self.img.paint(
+                &response,
+                &painter,
+                &self.train,
+                |train: &Matrix| {
+                    let size = [21, 21];
+                    let image = (0..train.rows())
+                        .map(|i| {
+                            [(train.flat()[i * train.cols() + 2] * 255.)
+                                .max(0.)
+                                .min(255.) as u8; 3]
+                        })
+                        .flatten()
+                        .collect::<Vec<_>>();
+                    egui::ColorImage::from_rgb(size, &image)
+                },
+                [5., 5.],
+            );
+
+            self.img_predict.clear();
+            self.img_predict.paint(
+                &response,
+                &painter,
+                (&self.train, &self.model),
+                |(train, model): (&Matrix, &Model)| {
+                    let size = [21, 21];
+                    let image = (0..train.rows())
+                        .map(|i| {
+                            let sample = train.row(i);
+                            let predict = model.predict(sample);
+                            [(predict[(0, 0)] * 255.).max(0.).min(255.) as u8; 3]
+                        })
+                        .flatten()
+                        .collect::<Vec<_>>();
+                    egui::ColorImage::from_rgb(size, &image)
+                },
+                [30., 5.],
+            );
+        });
+    }
 }
 
 impl eframe::App for DeepRenderApp {
@@ -281,12 +338,22 @@ impl eframe::App for DeepRenderApp {
                 });
             });
 
-        if self.train.cols() == 2 {
-            egui::TopBottomPanel::bottom("func_plot")
-                .resizable(true)
-                .min_height(100.)
-                .default_height(125.)
-                .show(ctx, |ui| self.func_plot(ui));
+        match self.train.cols() {
+            2 => {
+                egui::TopBottomPanel::bottom("func_plot")
+                    .resizable(true)
+                    .min_height(100.)
+                    .default_height(125.)
+                    .show(ctx, |ui| self.func_plot(ui));
+            }
+            3 => {
+                egui::TopBottomPanel::bottom("image_plot")
+                    .resizable(true)
+                    .min_height(100.)
+                    .default_height(125.)
+                    .show(ctx, |ui| self.image_plot(ui));
+            }
+            _ => (),
         }
 
         eframe::egui::CentralPanel::default().show(ctx, |ui| {
