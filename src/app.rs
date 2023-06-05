@@ -193,6 +193,7 @@ impl DeepRenderApp {
             ui.label("Activation fn:");
             ui.radio_value(&mut self.activation_fn, ActivationFn::Sigmoid, "Sigmoid");
             ui.radio_value(&mut self.activation_fn, ActivationFn::Relu, "ReLU");
+            ui.radio_value(&mut self.activation_fn, ActivationFn::Silu, "SiLU");
         });
 
         ui.group(|ui| {
