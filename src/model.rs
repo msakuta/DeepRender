@@ -1,12 +1,16 @@
 use std::fmt::Display;
 
-use crate::matrix::Matrix;
+use crate::{
+    matrix::Matrix,
+    optimizer::{Optimizer, OptimizerType},
+};
 
 pub(crate) struct Model {
     pub arch: Vec<usize>,
     pub weights: Vec<Matrix>,
     pub activation: fn(f64) -> f64,
     pub activation_derive: fn(f64) -> f64,
+    optimizer: Optimizer,
 }
 
 impl Display for Model {
@@ -23,17 +27,38 @@ impl Model {
         activation: fn(f64) -> f64,
         activation_derive: fn(f64) -> f64,
         random_scale: f64,
+        optimizer: OptimizerType,
     ) -> Self {
-        Self {
-            arch: shapes.to_vec(),
-            weights: shapes
+        fn shapes_to_matrix(
+            shapes: &[usize],
+            mat_create: impl Fn((&usize, &usize)) -> Matrix,
+        ) -> Vec<Matrix> {
+            shapes
                 .iter()
                 .take(shapes.len() - 1)
                 .zip(shapes.iter().skip(1))
-                .map(|(n, m)| Matrix::rand(*n + 1, *m).scale(random_scale))
-                .collect(),
+                .map(mat_create)
+                .collect()
+        }
+        let optimizer = match optimizer {
+            OptimizerType::Steepest => Optimizer::Steepest,
+            OptimizerType::Adam => {
+                let momentum = shapes_to_matrix(shapes, |(n, m)| Matrix::zeros(*n + 1, *m));
+                Optimizer::Adam {
+                    t: 0.,
+                    momentum1: momentum.clone(),
+                    momentum2: momentum,
+                }
+            }
+        };
+        Self {
+            arch: shapes.to_vec(),
+            weights: shapes_to_matrix(shapes, |(n, m)| {
+                Matrix::rand(*n + 1, *m).scale(random_scale)
+            }),
             activation,
             activation_derive,
+            optimizer,
         }
     }
 
@@ -88,16 +113,22 @@ impl Model {
         // Back propagation
         let mut loss = Matrix::new([[sample[sample.len() - 1] - signal[(0, 0)]]]);
 
-        for (layer_cache, weights) in layer_caches.iter().zip(self.weights.iter_mut()).rev() {
+        for ((l, layer_cache), weights) in layer_caches
+            .iter()
+            .enumerate()
+            .zip(self.weights.iter_mut())
+            .rev()
+        {
             let interm_derived = layer_cache.interm.map(self.activation_derive);
             let weights_shape = weights.shape();
             let signal_biased = &layer_cache.signal;
+            let mut diff = Matrix::zeros(weights_shape.0, weights_shape.1);
             for i in 0..weights_shape.0 {
                 for j in 0..weights_shape.1 {
-                    weights[(i, j)] +=
-                        rate * loss[(0, j)] * signal_biased[(0, i)] * interm_derived[(0, j)];
+                    diff[(i, j)] = loss[(0, j)] * signal_biased[(0, i)] * interm_derived[(0, j)];
                 }
             }
+            *weights += self.optimizer.apply(l, &diff).scale(rate);
             loss = &(&loss.t() * &interm_derived).sum_col() * &weights.t();
         }
     }

@@ -8,7 +8,10 @@ use eframe::{
     epaint::{pos2, Color32, Pos2, Rect},
 };
 
-use crate::{activation::ActivationFn, fit_model::FitModel, matrix::Matrix, model::Model};
+use crate::{
+    activation::ActivationFn, fit_model::FitModel, matrix::Matrix, model::Model,
+    optimizer::OptimizerType,
+};
 
 pub struct DeepRenderApp {
     fit_model: FitModel,
@@ -20,6 +23,7 @@ pub struct DeepRenderApp {
     loss_history: Vec<f64>,
     weights_history: Vec<Vec<f64>>,
     activation_fn: ActivationFn,
+    optimizer: OptimizerType,
 }
 
 impl DeepRenderApp {
@@ -33,11 +37,13 @@ impl DeepRenderApp {
         }
         arch.push(1);
         let activation_fn = ActivationFn::Sigmoid;
+        let optimizer = OptimizerType::Steepest;
         let model = Model::new(
             &arch,
             activation_fn.get(),
             activation_fn.get_derive(),
             activation_fn.random_scale(),
+            optimizer,
         );
         Self {
             fit_model: FitModel::Xor,
@@ -49,6 +55,7 @@ impl DeepRenderApp {
             loss_history: vec![],
             weights_history: vec![],
             activation_fn,
+            optimizer,
         }
     }
 
@@ -64,6 +71,7 @@ impl DeepRenderApp {
             self.activation_fn.get(),
             self.activation_fn.get_derive(),
             self.activation_fn.random_scale(),
+            self.optimizer,
         );
         self.loss_history = vec![];
         self.weights_history = vec![];
@@ -194,6 +202,12 @@ impl DeepRenderApp {
             ui.radio_value(&mut self.activation_fn, ActivationFn::Sigmoid, "Sigmoid");
             ui.radio_value(&mut self.activation_fn, ActivationFn::Relu, "ReLU");
             ui.radio_value(&mut self.activation_fn, ActivationFn::Silu, "SiLU");
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Optimizer:");
+            ui.radio_value(&mut self.optimizer, OptimizerType::Steepest, "Steepest");
+            ui.radio_value(&mut self.optimizer, OptimizerType::Adam, "Adam");
         });
 
         ui.group(|ui| {

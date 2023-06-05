@@ -164,6 +164,15 @@ impl Matrix {
             v: self.v.iter().map(|v| f * *v).collect(),
         }
     }
+
+    pub(crate) fn zip_mut<'a>(
+        &'a mut self,
+        other: &'a Matrix,
+    ) -> impl Iterator<Item = (&'a mut f64, &'a f64)> {
+        assert_eq!(self.rows, other.rows);
+        assert_eq!(self.cols, other.cols);
+        self.v.iter_mut().zip(other.v.iter())
+    }
 }
 
 impl Index<(usize, usize)> for Matrix {
@@ -224,6 +233,16 @@ fn test_add() {
     let b = Matrix::eye(3);
     let c = a + b;
     assert_eq!(c, Matrix::new([[2., 0., 0.], [0., 2., 0.], [0., 0., 2.]]));
+}
+
+impl std::ops::AddAssign for Matrix {
+    fn add_assign(&mut self, rhs: Self) {
+        assert_eq!(self.rows, rhs.rows);
+        assert_eq!(self.cols, rhs.cols);
+        for (lhs, rhs) in self.v.iter_mut().zip(rhs.v.iter()) {
+            *lhs += *rhs;
+        }
+    }
 }
 
 impl std::ops::Mul for &Matrix {

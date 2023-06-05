@@ -3,6 +3,7 @@ mod app;
 mod fit_model;
 mod matrix;
 mod model;
+mod optimizer;
 
 use app::DeepRenderApp;
 
