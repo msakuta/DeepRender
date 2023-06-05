@@ -9,8 +9,11 @@ use eframe::{
 };
 
 use crate::{
-    activation::ActivationFn, fit_model::FitModel, matrix::Matrix, model::Model,
-    optimizer::OptimizerType,
+    activation::ActivationFn,
+    fit_model::FitModel,
+    matrix::Matrix,
+    model::{new_model, ModelTrait},
+    optimizer::{AdamOptimizer, OptimizerType, SteepestDescentOptimizer},
 };
 
 pub struct DeepRenderApp {
@@ -18,7 +21,7 @@ pub struct DeepRenderApp {
     train: Matrix,
     hidden_layers: usize,
     hidden_nodes: usize,
-    model: Model,
+    model: Box<dyn ModelTrait>,
     rate: f64,
     loss_history: Vec<f64>,
     weights_history: Vec<Vec<f64>>,
@@ -38,13 +41,10 @@ impl DeepRenderApp {
         arch.push(1);
         let activation_fn = ActivationFn::Sigmoid;
         let optimizer = OptimizerType::Steepest;
-        let model = Model::new(
-            &arch,
-            activation_fn.get(),
-            activation_fn.get_derive(),
-            activation_fn.random_scale(),
-            optimizer,
-        );
+        let model = match optimizer {
+            OptimizerType::Steepest => new_model::<SteepestDescentOptimizer>(&arch, activation_fn),
+            OptimizerType::Adam => new_model::<AdamOptimizer>(&arch, activation_fn),
+        };
         Self {
             fit_model: FitModel::Xor,
             train,
@@ -66,13 +66,12 @@ impl DeepRenderApp {
             arch.push(self.hidden_nodes);
         }
         arch.push(1);
-        self.model = Model::new(
-            &arch,
-            self.activation_fn.get(),
-            self.activation_fn.get_derive(),
-            self.activation_fn.random_scale(),
-            self.optimizer,
-        );
+        self.model = match self.optimizer {
+            OptimizerType::Steepest => {
+                new_model::<SteepestDescentOptimizer>(&arch, self.activation_fn)
+            }
+            OptimizerType::Adam => new_model::<AdamOptimizer>(&arch, self.activation_fn),
+        };
         self.loss_history = vec![];
         self.weights_history = vec![];
     }
@@ -96,13 +95,13 @@ impl DeepRenderApp {
     }
 
     fn add_weights_history(&mut self) {
-        let elems = self.model.weights[0].flat().len();
+        let elems = self.model.get_weights()[0].flat().len();
         if self.weights_history.len() <= elems {
             self.weights_history.resize(elems, vec![]);
         }
         for i in 0..elems {
             if let Some(weights_history) = self.weights_history.get_mut(i) {
-                weights_history.push(self.model.weights[0].flat()[i]);
+                weights_history.push(self.model.get_weights()[0].flat()[i]);
             }
         }
     }
@@ -147,7 +146,7 @@ impl DeepRenderApp {
                 }
             };
 
-            for (n, weights) in self.model.weights.iter().enumerate() {
+            for (n, weights) in self.model.get_weights().iter().enumerate() {
                 let x = 30. + n as f32 * 70.;
                 for i in 0..weights.rows() {
                     // let rect = Rect{ min: pos2(30., 30. + i as f32 * 30.), max: pos2(80., 50. + i as f32 * 30.) };
@@ -171,7 +170,7 @@ impl DeepRenderApp {
                 for i in 0..weights.rows() {
                     // let rect = Rect{ min: pos2(30., 30. + i as f32 * 30.), max: pos2(80., 50. + i as f32 * 30.) };
                     let soure = pos2(x, 30. + i as f32 * 30.);
-                    for j in 0..self.model.arch[n + 1] {
+                    for j in 0..self.model.get_arch()[n + 1] {
                         let dest = pos2(x + 70., 30. + j as f32 * 30.);
                         painter.line_segment(
                             [

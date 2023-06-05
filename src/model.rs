@@ -1,19 +1,16 @@
 use std::fmt::Display;
 
-use crate::{
-    matrix::Matrix,
-    optimizer::{Optimizer, OptimizerType},
-};
+use crate::{activation::ActivationFn, matrix::Matrix, optimizer::Optimizer};
 
-pub(crate) struct Model {
-    pub arch: Vec<usize>,
-    pub weights: Vec<Matrix>,
-    pub activation: fn(f64) -> f64,
-    pub activation_derive: fn(f64) -> f64,
-    optimizer: Optimizer,
+pub(crate) struct Model<O: Optimizer> {
+    arch: Vec<usize>,
+    weights: Vec<Matrix>,
+    activation: fn(f64) -> f64,
+    activation_derive: fn(f64) -> f64,
+    optimizer: O,
 }
 
-impl Display for Model {
+impl<O: Optimizer> Display for Model<O> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Architecture: {:?}", self.arch)?;
         writeln!(f, "Weights: {:?}", self.weights)?;
@@ -21,48 +18,37 @@ impl Display for Model {
     }
 }
 
-impl Model {
-    pub(crate) fn new(
-        shapes: &[usize],
-        activation: fn(f64) -> f64,
-        activation_derive: fn(f64) -> f64,
-        random_scale: f64,
-        optimizer: OptimizerType,
-    ) -> Self {
-        fn shapes_to_matrix(
-            shapes: &[usize],
-            mat_create: impl Fn((&usize, &usize)) -> Matrix,
-        ) -> Vec<Matrix> {
-            shapes
-                .iter()
-                .take(shapes.len() - 1)
-                .zip(shapes.iter().skip(1))
-                .map(mat_create)
-                .collect()
-        }
-        let optimizer = match optimizer {
-            OptimizerType::Steepest => Optimizer::Steepest,
-            OptimizerType::Adam => {
-                let momentum = shapes_to_matrix(shapes, |(n, m)| Matrix::zeros(*n + 1, *m));
-                Optimizer::Adam {
-                    t: 0.,
-                    momentum1: momentum.clone(),
-                    momentum2: momentum,
-                }
-            }
-        };
-        Self {
-            arch: shapes.to_vec(),
-            weights: shapes_to_matrix(shapes, |(n, m)| {
-                Matrix::rand(*n + 1, *m).scale(random_scale)
-            }),
-            activation,
-            activation_derive,
-            optimizer,
+/// An extension trait to reuse the same method for both types of optimizers
+pub(crate) trait ModelTrait: Display {
+    fn get_arch(&self) -> &[usize];
+    fn learn(&mut self, rate: f64, train: &Matrix);
+    fn predict(&self, sample: &[f64]) -> Matrix;
+    fn loss(&self, train: &Matrix) -> f64;
+    fn get_weights(&self) -> &[Matrix];
+}
+
+impl<O: Optimizer> ModelTrait for Model<O> {
+    fn get_arch(&self) -> &[usize] {
+        &self.arch
+    }
+
+    fn learn(&mut self, rate: f64, train: &Matrix) {
+        for row in 0..train.rows() {
+            self.learn_iter(rate, train.row(row));
         }
     }
 
-    pub(crate) fn loss(&self, train: &Matrix) -> f64 {
+    fn predict(&self, sample: &[f64]) -> Matrix {
+        let mut input = Matrix::new_row(&sample[0..self.arch[0]]);
+        for weights in &self.weights {
+            let signal = input.hstack(&Matrix::ones(1, 1));
+            let interm = &signal * &weights;
+            input = interm.map(self.activation);
+        }
+        input
+    }
+
+    fn loss(&self, train: &Matrix) -> f64 {
         train
             .iter_rows()
             .map(|sample| {
@@ -73,19 +59,38 @@ impl Model {
             / 2.
     }
 
-    pub(crate) fn predict(&self, sample: &[f64]) -> Matrix {
-        let mut input = Matrix::new_row(&sample[0..self.arch[0]]);
-        for weights in &self.weights {
-            let signal = input.hstack(&Matrix::ones(1, 1));
-            let interm = &signal * &weights;
-            input = interm.map(self.activation);
-        }
-        input
+    fn get_weights(&self) -> &[Matrix] {
+        &self.weights
     }
+}
 
-    pub(crate) fn learn(&mut self, rate: f64, train: &Matrix) {
-        for row in 0..train.rows() {
-            self.learn_iter(rate, train.row(row));
+pub(crate) fn new_model<O: Optimizer + 'static>(
+    arch: &[usize],
+    activation_fn: ActivationFn,
+) -> Box<dyn ModelTrait> {
+    Box::new(Model::<O>::new(
+        arch,
+        activation_fn.get(),
+        activation_fn.get_derive(),
+        activation_fn.random_scale(),
+    ))
+}
+
+impl<O: Optimizer> Model<O> {
+    pub(crate) fn new(
+        shapes: &[usize],
+        activation: fn(f64) -> f64,
+        activation_derive: fn(f64) -> f64,
+        random_scale: f64,
+    ) -> Self {
+        Self {
+            arch: shapes.to_vec(),
+            weights: shapes_to_matrix(shapes, |(n, m)| {
+                Matrix::rand(*n + 1, *m).scale(random_scale)
+            }),
+            activation,
+            activation_derive,
+            optimizer: O::new(shapes),
         }
     }
 
@@ -132,4 +137,16 @@ impl Model {
             loss = &(&loss.t() * &interm_derived).sum_col() * &weights.t();
         }
     }
+}
+
+pub(crate) fn shapes_to_matrix(
+    shapes: &[usize],
+    mat_create: impl Fn((&usize, &usize)) -> Matrix,
+) -> Vec<Matrix> {
+    shapes
+        .iter()
+        .take(shapes.len() - 1)
+        .zip(shapes.iter().skip(1))
+        .map(mat_create)
+        .collect()
 }

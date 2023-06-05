@@ -28,7 +28,7 @@ fn silu_derive(x: f64) -> f64 {
     sigmoid_x * (1. + (1. - sigmoid_x))
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ActivationFn {
     Sigmoid,
     Relu,
