@@ -8,18 +8,28 @@ pub(crate) enum OptimizerType {
     Adam,
 }
 
+impl OptimizerType {
+    pub(crate) fn instantiate(&self, shape: &[usize]) -> Box<dyn Optimizer> {
+        match self {
+            OptimizerType::Steepest => Box::new(SteepestDescentOptimizer::new(shape)),
+            OptimizerType::Adam => Box::new(AdamOptimizer::new(shape)),
+        }
+    }
+}
+
 pub(crate) trait Optimizer {
-    fn new(shapes: &[usize]) -> Self;
     fn apply(&mut self, l: usize, diff: &Matrix) -> Matrix;
 }
 
 pub(crate) struct SteepestDescentOptimizer;
 
-impl Optimizer for SteepestDescentOptimizer {
+impl SteepestDescentOptimizer {
     fn new(_shapes: &[usize]) -> Self {
         Self
     }
+}
 
+impl Optimizer for SteepestDescentOptimizer {
     fn apply(&mut self, _l: usize, diff: &Matrix) -> Matrix {
         diff.clone()
     }
@@ -31,11 +41,7 @@ pub(crate) struct AdamOptimizer {
     momentum2: Vec<Matrix>,
 }
 
-const BETA1: f64 = 0.9;
-const BETA2: f64 = 0.999;
-const EPSILON: f64 = 1e-8;
-
-impl Optimizer for AdamOptimizer {
+impl AdamOptimizer {
     fn new(shapes: &[usize]) -> Self {
         let momentum = shapes_to_matrix(shapes, |(n, m)| Matrix::zeros(*n + 1, *m));
         Self {
@@ -44,7 +50,13 @@ impl Optimizer for AdamOptimizer {
             momentum2: momentum,
         }
     }
+}
 
+const BETA1: f64 = 0.9;
+const BETA2: f64 = 0.999;
+const EPSILON: f64 = 1e-8;
+
+impl Optimizer for AdamOptimizer {
     fn apply(&mut self, l: usize, diff: &Matrix) -> Matrix {
         self.t += 1.;
         let momentum1 = &mut self.momentum1[l];

@@ -9,11 +9,8 @@ use eframe::{
 };
 
 use crate::{
-    activation::ActivationFn,
-    fit_model::FitModel,
-    matrix::Matrix,
-    model::{new_model, ModelTrait},
-    optimizer::{AdamOptimizer, OptimizerType, SteepestDescentOptimizer},
+    activation::ActivationFn, fit_model::FitModel, matrix::Matrix, model::Model,
+    optimizer::OptimizerType,
 };
 
 pub struct DeepRenderApp {
@@ -21,7 +18,7 @@ pub struct DeepRenderApp {
     train: Matrix,
     hidden_layers: usize,
     hidden_nodes: usize,
-    model: Box<dyn ModelTrait>,
+    model: Model,
     rate: f64,
     loss_history: Vec<f64>,
     weights_history: Vec<Vec<f64>>,
@@ -41,10 +38,7 @@ impl DeepRenderApp {
         arch.push(1);
         let activation_fn = ActivationFn::Sigmoid;
         let optimizer = OptimizerType::Steepest;
-        let model = match optimizer {
-            OptimizerType::Steepest => new_model::<SteepestDescentOptimizer>(&arch, activation_fn),
-            OptimizerType::Adam => new_model::<AdamOptimizer>(&arch, activation_fn),
-        };
+        let model = Model::new(&arch, activation_fn, optimizer.instantiate(&arch));
         Self {
             fit_model: FitModel::Xor,
             train,
@@ -66,12 +60,7 @@ impl DeepRenderApp {
             arch.push(self.hidden_nodes);
         }
         arch.push(1);
-        self.model = match self.optimizer {
-            OptimizerType::Steepest => {
-                new_model::<SteepestDescentOptimizer>(&arch, self.activation_fn)
-            }
-            OptimizerType::Adam => new_model::<AdamOptimizer>(&arch, self.activation_fn),
-        };
+        self.model = Model::new(&arch, self.activation_fn, self.optimizer.instantiate(&arch));
         self.loss_history = vec![];
         self.weights_history = vec![];
     }
