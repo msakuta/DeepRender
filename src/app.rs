@@ -30,6 +30,7 @@ pub struct DeepRenderApp {
     weights_history: Vec<Vec<f64>>,
     activation_fn: ActivationFn,
     optimizer: OptimizerType,
+    paused: bool,
     plot_network: bool,
     plot_weights: bool,
     print_weights: bool,
@@ -66,6 +67,7 @@ impl DeepRenderApp {
             weights_history: vec![],
             activation_fn,
             optimizer,
+            paused: false,
             plot_network: true,
             plot_weights: true,
             print_weights: true,
@@ -197,9 +199,16 @@ impl DeepRenderApp {
     }
 
     fn ui_panel(&mut self, ui: &mut Ui) {
-        if ui.button("Reset").clicked() {
-            self.reset();
-        }
+        ui.horizontal(|ui| {
+            if ui.button("Reset").clicked() {
+                self.reset();
+            }
+
+            let paused_label = if self.paused { "Unpause" } else { "Pause" };
+            if ui.button(paused_label).clicked() {
+                self.paused = !self.paused;
+            }
+        });
 
         ui.group(|ui| {
             ui.label("Fit model:");
@@ -345,9 +354,11 @@ impl DeepRenderApp {
 
 impl eframe::App for DeepRenderApp {
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
-        ctx.request_repaint();
+        if !self.paused {
+            ctx.request_repaint();
 
-        self.learn_iter();
+            self.learn_iter();
+        }
 
         eframe::egui::SidePanel::right("side_panel")
             .min_width(200.)
