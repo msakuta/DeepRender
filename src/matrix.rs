@@ -35,6 +35,14 @@ impl Matrix {
         }
     }
 
+    pub(crate) fn zeros_like(other: &Matrix) -> Self {
+        Self {
+            rows: other.rows,
+            cols: other.cols,
+            v: vec![0.; other.rows * other.cols],
+        }
+    }
+
     pub(crate) fn ones(row: usize, col: usize) -> Self {
         Self {
             rows: row,
@@ -63,22 +71,18 @@ impl Matrix {
 
     pub(crate) fn hstack(&self, other: &Self) -> Self {
         assert_eq!(self.rows, other.rows);
-        let row = self.rows;
-        let col = self.cols + other.cols;
-        let mut v = vec![0.; self.rows * (self.cols + other.cols)];
+        let rows = self.rows;
+        let cols = self.cols + other.cols;
+        let mut v = vec![0.; self.rows * cols];
         for r in 0..self.rows {
             for c in 0..self.cols {
-                v[r * col + c] = self.v[r * self.cols + c];
+                v[r * cols + c] = self.v[r * self.cols + c];
             }
             for c in 0..other.cols {
-                v[r * col + c + self.cols] = other.v[r * other.cols + c];
+                v[r * cols + c + self.cols] = other.v[r * other.cols + c];
             }
         }
-        Self {
-            rows: row,
-            cols: col,
-            v,
-        }
+        Self { rows, cols, v }
     }
 
     pub(crate) fn eye(size: usize) -> Self {
@@ -127,6 +131,33 @@ impl Matrix {
         &self.v[r * self.cols..(r + 1) * self.cols]
     }
 
+    pub(crate) fn cols_range(&self, start: usize, end: usize) -> Matrix {
+        let cols = end - start;
+        let mut v = vec![0.; cols * self.rows];
+        for r in 0..self.rows {
+            for c in start..end {
+                v[r * cols + c] = self.v[r * self.cols + c];
+            }
+        }
+        Self {
+            rows: self.rows,
+            cols,
+            v,
+        }
+    }
+
+    pub(crate) fn col(&self, c: usize) -> Matrix {
+        let mut v = Vec::with_capacity(self.rows);
+        for r in 0..self.rows {
+            v.push(self.v[r * self.cols + c]);
+        }
+        Self {
+            rows: self.rows,
+            cols: 1,
+            v,
+        }
+    }
+
     pub(crate) fn iter_rows(&self) -> impl Iterator<Item = &[f64]> {
         (0..self.rows).map(|r| &self.v[r * self.cols..(r + 1) * self.cols])
     }
@@ -172,6 +203,21 @@ impl Matrix {
         assert_eq!(self.rows, other.rows);
         assert_eq!(self.cols, other.cols);
         self.v.iter_mut().zip(other.v.iter())
+    }
+
+    pub(crate) fn elementwise_mul(&self, rhs: &Self) -> Self {
+        assert_eq!(self.cols, rhs.cols);
+        assert_eq!(self.rows, rhs.rows);
+        Matrix {
+            rows: self.rows,
+            cols: self.cols,
+            v: self
+                .v
+                .iter()
+                .zip(rhs.v.iter())
+                .map(|(l, r)| *l * *r)
+                .collect(),
+        }
     }
 }
 
@@ -241,6 +287,23 @@ impl std::ops::AddAssign for Matrix {
         assert_eq!(self.cols, rhs.cols);
         for (lhs, rhs) in self.v.iter_mut().zip(rhs.v.iter()) {
             *lhs += *rhs;
+        }
+    }
+}
+
+impl std::ops::Sub for Matrix {
+    type Output = Self;
+    fn sub(self, other: Matrix) -> Matrix {
+        assert_eq!(self.rows, other.rows);
+        assert_eq!(self.cols, other.cols);
+        let mut v = self.v;
+        for (v, o) in v.iter_mut().zip(other.v.iter()) {
+            *v -= o;
+        }
+        Self {
+            rows: self.rows,
+            cols: self.cols,
+            v,
         }
     }
 }

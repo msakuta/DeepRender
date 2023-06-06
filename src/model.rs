@@ -40,9 +40,7 @@ impl Model {
     }
 
     pub(crate) fn learn(&mut self, rate: f64, train: &Matrix) {
-        for row in 0..train.rows() {
-            self.learn_iter(rate, train.row(row));
-        }
+        self.learn_iter(rate, train);
     }
 
     pub(crate) fn predict(&self, sample: &[f64]) -> Matrix {
@@ -70,19 +68,17 @@ impl Model {
         &self.weights
     }
 
-    fn learn_iter(&mut self, rate: f64, sample: &[f64]) {
-        let input = Matrix::new_row(&sample[0..sample.len() - 1]);
-
+    fn learn_iter(&mut self, rate: f64, samples: &Matrix) {
         struct LayerCache {
             signal: Matrix,
             interm: Matrix,
         }
 
         // Forward propagation
-        let mut signal = input.clone();
+        let mut signal = samples.cols_range(0, samples.cols() - 1);
         let mut layer_caches = vec![];
         for weights in self.weights.iter() {
-            let signal_biased = signal.hstack(&Matrix::ones(1, 1));
+            let signal_biased = signal.hstack(&Matrix::ones(signal.rows(), 1));
             let interm = &signal_biased * &weights;
             signal = interm.map(self.activation);
             layer_caches.push(LayerCache {
@@ -92,7 +88,7 @@ impl Model {
         }
 
         // Back propagation
-        let mut loss = Matrix::new([[sample[sample.len() - 1] - signal[(0, 0)]]]);
+        let mut loss = samples.col(samples.cols() - 1) - signal;
 
         for ((l, layer_cache), weights) in layer_caches
             .iter()
@@ -106,11 +102,16 @@ impl Model {
             let mut diff = Matrix::zeros(weights_shape.0, weights_shape.1);
             for i in 0..weights_shape.0 {
                 for j in 0..weights_shape.1 {
-                    diff[(i, j)] = loss[(0, j)] * signal_biased[(0, i)] * interm_derived[(0, j)];
+                    let mut diff_sum = 0.;
+                    for l in 0..loss.rows() {
+                        diff_sum += loss[(l, j)] * signal_biased[(l, i)] * interm_derived[(l, j)];
+                    }
+                    diff[(i, j)] = diff_sum;
                 }
             }
             *weights += self.optimizer.apply(l, &diff).scale(rate);
-            loss = &(&loss.t() * &interm_derived).sum_col() * &weights.t();
+            let loss_derived = loss.elementwise_mul(&interm_derived);
+            loss = &loss_derived * &weights.t().cols_range(0, weights.rows() - 1);
         }
     }
 }

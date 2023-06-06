@@ -7,6 +7,7 @@ use eframe::{
     },
     epaint::{pos2, Color32, Pos2, Rect},
 };
+use rand::seq::SliceRandom;
 
 use crate::{
     activation::ActivationFn,
@@ -17,10 +18,18 @@ use crate::{
     optimizer::OptimizerType,
 };
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum TrainBatch {
+    Sequence,
+    Shuffle,
+    Full,
+}
+
 pub struct DeepRenderApp {
     fit_model: FitModel,
     file_name: String,
     train: Matrix,
+    train_batch: TrainBatch,
     image_size: Option<ImageSize>,
     hidden_layers: usize,
     hidden_nodes: usize,
@@ -58,6 +67,7 @@ impl DeepRenderApp {
             fit_model: FitModel::Xor,
             file_name,
             train,
+            train_batch: TrainBatch::Sequence,
             image_size,
             hidden_layers,
             hidden_nodes: 2,
@@ -90,7 +100,22 @@ impl DeepRenderApp {
     }
 
     fn learn_iter(&mut self) {
-        self.model.learn((10.0f64).powf(self.rate), &self.train);
+        let rate = (10.0f64).powf(self.rate);
+        match self.train_batch {
+            TrainBatch::Sequence => {
+                for sample in self.train.iter_rows() {
+                    self.model.learn(rate, &Matrix::new_row(sample));
+                }
+            }
+            TrainBatch::Shuffle => {
+                let mut order: Vec<_> = (0..self.train.rows()).collect();
+                order.shuffle(&mut rand::thread_rng());
+                for i in order {
+                    self.model.learn(rate, &Matrix::new_row(self.train.row(i)));
+                }
+            }
+            TrainBatch::Full => self.model.learn(rate, &self.train),
+        }
         self.loss_history.push(self.model.loss(&self.train));
         self.add_weights_history();
     }
@@ -240,6 +265,13 @@ impl DeepRenderApp {
             ui.label("Optimizer:");
             ui.radio_value(&mut self.optimizer, OptimizerType::Steepest, "Steepest");
             ui.radio_value(&mut self.optimizer, OptimizerType::Adam, "Adam");
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Train batch: ");
+            ui.radio_value(&mut self.train_batch, TrainBatch::Sequence, "Sequence");
+            ui.radio_value(&mut self.train_batch, TrainBatch::Shuffle, "Shuffle");
+            ui.radio_value(&mut self.train_batch, TrainBatch::Full, "Full");
         });
 
         ui.group(|ui| {
