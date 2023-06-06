@@ -36,12 +36,6 @@ impl FitModel {
                     })
                     .flatten()
                     .collect();
-                dbg!(
-                    data.iter()
-                        .fold(0., |acc, cur| if acc < cur[2] { cur[2] } else { acc }),
-                    data.iter()
-                        .fold(0., |acc, cur| if acc < cur[2] { acc } else { cur[2] })
-                );
                 Matrix::from_slice(&data)
             }
         }
