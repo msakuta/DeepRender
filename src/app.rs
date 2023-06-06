@@ -212,12 +212,12 @@ impl DeepRenderApp {
 
             ui.horizontal(|ui| {
                 ui.label("Hidden layers:");
-                ui.add(egui::Slider::new(&mut self.hidden_layers, 1..=5));
+                ui.add(egui::Slider::new(&mut self.hidden_layers, 1..=10));
             });
 
             ui.horizontal(|ui| {
                 ui.label("Hidden nodes:");
-                ui.add(egui::Slider::new(&mut self.hidden_nodes, 1..=10));
+                ui.add(egui::Slider::new(&mut self.hidden_nodes, 1..=30));
             });
         });
 
