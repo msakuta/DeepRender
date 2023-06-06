@@ -33,7 +33,7 @@ pub struct DeepRenderApp {
 impl DeepRenderApp {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let fit_model = FitModel::Xor;
-        let train = fit_model.train_data();
+        let train = fit_model.train_data().unwrap();
         let hidden_layers = 1;
         let mut arch = vec![train.cols() - 1];
         for _ in 0..hidden_layers {
@@ -60,7 +60,7 @@ impl DeepRenderApp {
     }
 
     fn reset(&mut self) {
-        self.train = self.fit_model.train_data();
+        self.train = self.fit_model.train_data().unwrap();
         let mut arch = vec![self.train.cols() - 1];
         for _ in 0..self.hidden_layers {
             arch.push(self.hidden_nodes);
@@ -189,7 +189,8 @@ impl DeepRenderApp {
             ui.label("Fit model:");
             ui.radio_value(&mut self.fit_model, FitModel::Xor, "Xor");
             ui.radio_value(&mut self.fit_model, FitModel::Sine, "Sine");
-            ui.radio_value(&mut self.fit_model, FitModel::Image, "Image");
+            ui.radio_value(&mut self.fit_model, FitModel::SynthImage, "SynthImage");
+            ui.radio_value(&mut self.fit_model, FitModel::FileImage, "FileImage");
         });
 
         ui.horizontal(|ui| {
