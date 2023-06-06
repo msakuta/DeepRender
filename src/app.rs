@@ -30,6 +30,7 @@ pub struct DeepRenderApp {
     weights_history: Vec<Vec<f64>>,
     activation_fn: ActivationFn,
     optimizer: OptimizerType,
+    plot_weights: bool,
     print_weights: bool,
 
     // Widgets
@@ -64,6 +65,7 @@ impl DeepRenderApp {
             weights_history: vec![],
             activation_fn,
             optimizer,
+            plot_weights: true,
             print_weights: true,
             img: BgImage::new(),
             img_predict: BgImage::new(),
@@ -251,6 +253,8 @@ impl DeepRenderApp {
             ui.label(format!("Descent rate: {}", (10.0f64).powf(self.rate)));
         });
 
+        ui.checkbox(&mut self.plot_weights, "Plot weights (uncheck for speed)");
+
         ui.checkbox(&mut self.print_weights, "Print weights (uncheck for speed)");
 
         ui.label(format!("Loss: {}", self.model.loss(&self.train)));
@@ -352,18 +356,20 @@ impl eframe::App for DeepRenderApp {
                 self.paint_graph(ui);
             });
 
-        egui::TopBottomPanel::bottom("weight_plot")
-            .resizable(true)
-            .min_height(100.)
-            .default_height(125.)
-            .show(ctx, |ui| {
-                let plot = Plot::new("plot");
-                plot.legend(Legend::default()).show(ui, |plot_ui| {
-                    for line in self.weights_history() {
-                        plot_ui.line(line)
-                    }
+        if self.plot_weights {
+            egui::TopBottomPanel::bottom("weight_plot")
+                .resizable(true)
+                .min_height(100.)
+                .default_height(125.)
+                .show(ctx, |ui| {
+                    let plot = Plot::new("plot");
+                    plot.legend(Legend::default()).show(ui, |plot_ui| {
+                        for line in self.weights_history() {
+                            plot_ui.line(line)
+                        }
+                    });
                 });
-            });
+        }
 
         match self.train.cols() {
             2 => {
