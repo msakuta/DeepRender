@@ -3,19 +3,25 @@ use eframe::{
         self,
         plot::{Legend, Line, PlotPoints},
         widgets::plot::Plot,
-        Frame, Ui,
+        Frame, TextEdit, Ui,
     },
     epaint::{pos2, Color32, Pos2, Rect},
 };
 
 use crate::{
-    activation::ActivationFn, bg_image::BgImage, fit_model::FitModel, matrix::Matrix, model::Model,
+    activation::ActivationFn,
+    bg_image::BgImage,
+    fit_model::{FitModel, ImageSize},
+    matrix::Matrix,
+    model::Model,
     optimizer::OptimizerType,
 };
 
 pub struct DeepRenderApp {
     fit_model: FitModel,
+    file_name: String,
     train: Matrix,
+    image_size: Option<ImageSize>,
     hidden_layers: usize,
     hidden_nodes: usize,
     model: Model,
@@ -33,7 +39,8 @@ pub struct DeepRenderApp {
 impl DeepRenderApp {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let fit_model = FitModel::Xor;
-        let train = fit_model.train_data().unwrap();
+        let file_name = "alan.jpg".to_string();
+        let (train, image_size) = fit_model.train_data(&file_name).unwrap();
         let hidden_layers = 1;
         let mut arch = vec![train.cols() - 1];
         for _ in 0..hidden_layers {
@@ -45,7 +52,9 @@ impl DeepRenderApp {
         let model = Model::new(&arch, activation_fn, optimizer.instantiate(&arch));
         Self {
             fit_model: FitModel::Xor,
+            file_name,
             train,
+            image_size,
             hidden_layers,
             hidden_nodes: 2,
             model,
@@ -60,7 +69,7 @@ impl DeepRenderApp {
     }
 
     fn reset(&mut self) {
-        self.train = self.fit_model.train_data().unwrap();
+        (self.train, self.image_size) = self.fit_model.train_data(&self.file_name).unwrap();
         let mut arch = vec![self.train.cols() - 1];
         for _ in 0..self.hidden_layers {
             arch.push(self.hidden_nodes);
@@ -186,12 +195,23 @@ impl DeepRenderApp {
             self.reset();
         }
 
-        ui.horizontal(|ui| {
+        ui.group(|ui| {
             ui.label("Fit model:");
-            ui.radio_value(&mut self.fit_model, FitModel::Xor, "Xor");
-            ui.radio_value(&mut self.fit_model, FitModel::Sine, "Sine");
-            ui.radio_value(&mut self.fit_model, FitModel::SynthImage, "SynthImage");
-            ui.radio_value(&mut self.fit_model, FitModel::FileImage, "FileImage");
+
+            ui.horizontal(|ui| {
+                ui.radio_value(&mut self.fit_model, FitModel::Xor, "Xor");
+                ui.radio_value(&mut self.fit_model, FitModel::Sine, "Sine");
+                ui.radio_value(&mut self.fit_model, FitModel::SynthImage, "SynthImage");
+                ui.radio_value(&mut self.fit_model, FitModel::FileImage, "FileImage");
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("File name:");
+                ui.add_enabled(
+                    matches!(self.fit_model, FitModel::FileImage),
+                    TextEdit::singleline(&mut self.file_name),
+                );
+            });
         });
 
         ui.horizontal(|ui| {
@@ -264,16 +284,15 @@ impl DeepRenderApp {
             let (response, painter) =
                 ui.allocate_painter(ui.available_size(), egui::Sense::hover());
 
-            if self.train.rows() != 21 * 21 {
+            let Some(image_size) = self.image_size else {
                 return;
-            }
+            };
 
             self.img.paint(
                 &response,
                 &painter,
                 &self.train,
                 |train: &Matrix| {
-                    let size = [21, 21];
                     let image = (0..train.rows())
                         .map(|i| {
                             [(train.flat()[i * train.cols() + 2] * 255.)
@@ -282,7 +301,7 @@ impl DeepRenderApp {
                         })
                         .flatten()
                         .collect::<Vec<_>>();
-                    egui::ColorImage::from_rgb(size, &image)
+                    egui::ColorImage::from_rgb(image_size, &image)
                 },
                 [5., 5.],
             );
@@ -293,7 +312,6 @@ impl DeepRenderApp {
                 &painter,
                 (&self.train, &self.model),
                 |(train, model): (&Matrix, &Model)| {
-                    let size = [21, 21];
                     let image = (0..train.rows())
                         .map(|i| {
                             let sample = train.row(i);
@@ -302,9 +320,9 @@ impl DeepRenderApp {
                         })
                         .flatten()
                         .collect::<Vec<_>>();
-                    egui::ColorImage::from_rgb(size, &image)
+                    egui::ColorImage::from_rgb(image_size, &image)
                 },
-                [30., 5.],
+                [image_size[0] as f32 + 10., 5.],
             );
         });
     }
