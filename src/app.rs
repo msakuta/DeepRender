@@ -30,6 +30,7 @@ pub struct DeepRenderApp {
     weights_history: Vec<Vec<f64>>,
     activation_fn: ActivationFn,
     optimizer: OptimizerType,
+    print_weights: bool,
 
     // Widgets
     img: BgImage,
@@ -63,6 +64,7 @@ impl DeepRenderApp {
             weights_history: vec![],
             activation_fn,
             optimizer,
+            print_weights: true,
             img: BgImage::new(),
             img_predict: BgImage::new(),
         }
@@ -249,11 +251,16 @@ impl DeepRenderApp {
             ui.label(format!("Descent rate: {}", (10.0f64).powf(self.rate)));
         });
 
+        ui.checkbox(&mut self.print_weights, "Print weights (uncheck for speed)");
+
         ui.label(format!("Loss: {}", self.model.loss(&self.train)));
-        ui.label(format!("Model:\n{}", self.model));
-        for sample in self.train.iter_rows() {
-            let predict = self.model.predict(sample);
-            ui.label(format!("{} -> {}", Matrix::new_row(&sample[0..2]), predict));
+
+        if self.print_weights {
+            ui.label(format!("Model:\n{}", self.model));
+            for sample in self.train.iter_rows() {
+                let predict = self.model.predict(sample);
+                ui.label(format!("{} -> {}", Matrix::new_row(&sample[0..2]), predict));
+            }
         }
     }
 
