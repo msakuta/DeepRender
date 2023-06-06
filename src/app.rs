@@ -30,6 +30,7 @@ pub struct DeepRenderApp {
     weights_history: Vec<Vec<f64>>,
     activation_fn: ActivationFn,
     optimizer: OptimizerType,
+    plot_network: bool,
     plot_weights: bool,
     print_weights: bool,
 
@@ -65,6 +66,7 @@ impl DeepRenderApp {
             weights_history: vec![],
             activation_fn,
             optimizer,
+            plot_network: true,
             plot_weights: true,
             print_weights: true,
             img: BgImage::new(),
@@ -253,6 +255,8 @@ impl DeepRenderApp {
             ui.label(format!("Descent rate: {}", (10.0f64).powf(self.rate)));
         });
 
+        ui.checkbox(&mut self.plot_network, "Plot network");
+
         ui.checkbox(&mut self.plot_weights, "Plot weights (uncheck for speed)");
 
         ui.checkbox(&mut self.print_weights, "Print weights (uncheck for speed)");
@@ -349,12 +353,14 @@ impl eframe::App for DeepRenderApp {
             .min_width(200.)
             .show(ctx, |ui| self.ui_panel(ui));
 
-        egui::TopBottomPanel::bottom("graph")
-            .resizable(true)
-            .min_height(100.)
-            .show(ctx, |ui| {
-                self.paint_graph(ui);
-            });
+        if self.plot_network {
+            egui::TopBottomPanel::bottom("graph")
+                .resizable(true)
+                .min_height(100.)
+                .show(ctx, |ui| {
+                    self.paint_graph(ui);
+                });
+        }
 
         if self.plot_weights {
             egui::TopBottomPanel::bottom("weight_plot")
