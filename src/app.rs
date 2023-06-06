@@ -69,6 +69,7 @@ impl DeepRenderApp {
         self.model = Model::new(&arch, self.activation_fn, self.optimizer.instantiate(&arch));
         self.loss_history = vec![];
         self.weights_history = vec![];
+        self.img.clear();
     }
 
     fn learn_iter(&mut self) {
