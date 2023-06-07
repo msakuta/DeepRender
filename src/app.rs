@@ -291,7 +291,10 @@ impl DeepRenderApp {
 
             ui.horizontal(|ui| {
                 ui.label("Batch size:");
-                ui.add(egui::Slider::new(&mut self.batch_size, 1..=100));
+                ui.add_enabled(
+                    !matches!(self.train_batch, TrainBatch::Full),
+                    egui::Slider::new(&mut self.batch_size, 1..=self.train.rows()),
+                );
             })
         });
 
