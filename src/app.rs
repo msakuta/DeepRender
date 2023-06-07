@@ -259,6 +259,8 @@ impl DeepRenderApp {
                 ui.radio_value(&mut self.fit_model, FitModel::FileImage, "FileImage");
             });
 
+            ui.radio_value(&mut self.fit_model, FitModel::RaytraceImage, "RaycastImage");
+
             ui.horizontal(|ui| {
                 ui.label("File name:");
                 ui.add_enabled(

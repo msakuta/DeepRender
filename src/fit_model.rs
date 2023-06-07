@@ -1,7 +1,14 @@
 use crate::matrix::Matrix;
+use ray_rust::{
+    render::{
+        render, RenderColor, RenderEnv, RenderFloor, RenderMaterial, RenderObject, RenderPattern,
+        RenderSphere, UVMap,
+    },
+    vec3::Vec3,
+};
 
 use image::io::Reader as ImageReader;
-use std::path::Path;
+use std::{collections::HashMap, path::Path, sync::Arc};
 
 #[derive(PartialEq, Eq)]
 pub(crate) enum FitModel {
@@ -11,7 +18,12 @@ pub(crate) enum FitModel {
     SynthImage,
     /// Image loaded from file
     FileImage,
+    /// A synthesized image by ray tracing renderer
+    RaytraceImage,
 }
+
+const IMAGE_HALFWIDTH: i32 = 10;
+const IMAGE_WIDTH: usize = IMAGE_HALFWIDTH as usize * 2 + 1;
 
 pub(crate) type ImageSize = [usize; 2];
 
@@ -29,14 +41,12 @@ impl FitModel {
                 Ok((Matrix::new(train), None))
             }
             Self::Sine => {
-                let data: Vec<_> = (-20..=20)
-                    .map(|f| [f as f64, (f as f64 / 4.).sin() * 0.5 + 0.5])
+                let data: Vec<_> = (-50..=50)
+                    .map(|f| [f as f64 / 50., (f as f64 / 4.).sin() * 0.5 + 0.5])
                     .collect();
                 Ok((Matrix::from_slice(&data), None))
             }
             Self::SynthImage => {
-                const IMAGE_HALFWIDTH: i32 = 10;
-                const IMAGE_WIDTH: usize = IMAGE_HALFWIDTH as usize * 2 + 1;
                 let data: Vec<_> = (-IMAGE_HALFWIDTH..=IMAGE_HALFWIDTH)
                     .map(|y| {
                         (-IMAGE_HALFWIDTH..=IMAGE_HALFWIDTH).map(move |x| {
@@ -72,6 +82,116 @@ impl FitModel {
                     Some([width as usize, height as usize]),
                 ))
             }
+            Self::RaytraceImage => {
+                let buf = &render_main();
+                let data: Vec<_> = (-IMAGE_HALFWIDTH..=IMAGE_HALFWIDTH)
+                    .map(|y| {
+                        (-IMAGE_HALFWIDTH..=IMAGE_HALFWIDTH).map(move |x| {
+                            let ux = (x + IMAGE_HALFWIDTH) as usize;
+                            let uy = (y + IMAGE_HALFWIDTH) as usize;
+                            [
+                                x as f64,
+                                y as f64,
+                                // (x as f64 / 4.).sin() * (y as f64 / 4.).sin() * 0.5 + 0.5,
+                                buf[uy * IMAGE_WIDTH + ux as usize] as f64,
+                            ]
+                        })
+                    })
+                    .flatten()
+                    .collect();
+                Ok((Matrix::from_slice(&data), Some([IMAGE_WIDTH; 2])))
+            }
         }
     }
+}
+
+fn render_main() -> Vec<f32> {
+    let mut materials: HashMap<String, Arc<RenderMaterial>> = HashMap::new();
+
+    fn bg(_env: &RenderEnv, _pos: &Vec3) -> RenderColor {
+        RenderColor::new(0.5, 0.5, 0.5)
+    }
+
+    let floor_material = Arc::new(
+        RenderMaterial::new(
+            "floor".to_string(),
+            RenderColor::new(1.0, 1.0, 0.0),
+            RenderColor::new(0.0, 0.0, 0.0),
+            0,
+            0.,
+            0.0,
+        )
+        .pattern(RenderPattern::RepeatedGradation)
+        .pattern_scale(300.)
+        .pattern_angle_scale(0.2)
+        .texture_ok("bar.png"),
+    );
+    materials.insert("floor".to_string(), floor_material);
+
+    let red_material = Arc::new(
+        RenderMaterial::new(
+            "red".to_string(),
+            RenderColor::new(0.8, 0.0, 0.0),
+            RenderColor::new(0.0, 0.0, 0.0),
+            24,
+            0.,
+            0.0,
+        )
+        .glow_dist(5.),
+    );
+
+    // let transparent_material = Arc::new(
+    //     RenderMaterial::new(
+    //         "transparent".to_string(),
+    //         RenderColor::new(0.0, 0.0, 0.0),
+    //         RenderColor::new(0.0, 0.0, 0.0),
+    //         0,
+    //         1.,
+    //         1.5,
+    //     )
+    //     .frac(RenderColor::new(1.49998, 1.49999, 1.5)),
+    // );
+
+    let objects: Vec<RenderObject> = vec![
+        /* Plane */
+        RenderObject::Floor(
+            RenderFloor::new_raw(
+                materials.get("floor").unwrap().clone(),
+                Vec3::new(0.0, -150.0, 0.0),
+                Vec3::new(0., 1., 0.),
+            )
+            .uvmap(UVMap::ZX),
+        ),
+        // RenderFloor::new (floor_material,       Vec3::new(-300.0,   0.0,  0.0),  Vec3::new(1., 0., 0.)),
+        /* Spheres */
+        // RenderSphere::new(mirror_material.clone(), 80.0, Vec3::new(0.0, -30.0, 172.0)),
+        // RenderSphere::new(mirror_material, 80.0, Vec3::new(-200.0, -30.0, 172.0)),
+        // RenderSphere::new(red_material, 80.0, Vec3::new(-200.0, -200.0, 172.0)),
+        /*	{80.0F,  70.0F,-200.0F,150.0F, 0.0F, 0.0F, 0.8F, 0.0F, 0.0F, 0.0F, 0.0F,24, 1., 1., {1.}},*/
+        RenderSphere::new(red_material, 100.0, Vec3::new(0.0, -50.0, 100.0)),
+        /*	{000.F, 0.F, 0.F, 1500.F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 1.0F, 1.0F,24, 0, 0},*/
+        /*	{100.F, -70.F, -150.F, 160.F, 0.0F, 0.5F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F,24, .5F, .2F},*/
+    ];
+
+    use std::f32::consts::PI;
+
+    let render_env = RenderEnv::new(
+        Vec3::new(0., 2., -100.),
+        Vec3::new(PI / 12., -PI / 2., -PI / 2.), /* pyr */
+        IMAGE_WIDTH as i32,
+        IMAGE_WIDTH as i32,
+        1.,
+        1.,
+        bg,
+    )
+    .materials(materials)
+    .objects(objects)
+    .light(Vec3::new(50., 60., -50.));
+    let mut buf = vec![0.; IMAGE_WIDTH * IMAGE_WIDTH];
+    render(
+        &render_env,
+        &mut |x, y, color| buf[y as usize * IMAGE_WIDTH + x as usize] = color.r,
+        1,
+    );
+    buf
 }
