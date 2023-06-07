@@ -2,7 +2,7 @@ use crate::matrix::Matrix;
 use ray_rust::{
     render::{
         render, RenderColor, RenderEnv, RenderFloor, RenderMaterial, RenderObject, RenderPattern,
-        RenderSphere, UVMap,
+        RenderSphere,
     },
     vec3::Vec3,
 };
@@ -22,8 +22,7 @@ pub(crate) enum FitModel {
     RaytraceImage,
 }
 
-const IMAGE_HALFWIDTH: i32 = 10;
-const IMAGE_WIDTH: usize = IMAGE_HALFWIDTH as usize * 2 + 1;
+pub(crate) const IMAGE_HALFWIDTH: i32 = 15;
 
 pub(crate) type ImageSize = [usize; 2];
 
@@ -31,6 +30,7 @@ impl FitModel {
     pub(crate) fn train_data(
         &self,
         file_name: &impl AsRef<Path>,
+        image_size: i32,
     ) -> Result<(Matrix, Option<ImageSize>), Box<dyn std::error::Error>> {
         match self {
             Self::Xor => {
@@ -47,19 +47,21 @@ impl FitModel {
                 Ok((Matrix::from_slice(&data), None))
             }
             Self::SynthImage => {
-                let data: Vec<_> = (-IMAGE_HALFWIDTH..=IMAGE_HALFWIDTH)
+                let image_size_i = image_size as i32;
+                let image_width = image_size as usize * 2 + 1;
+                let data: Vec<_> = (-image_size_i..=image_size_i)
                     .map(|y| {
-                        (-IMAGE_HALFWIDTH..=IMAGE_HALFWIDTH).map(move |x| {
+                        (-image_size_i..=image_size_i).map(move |x| {
                             [
-                                x as f64,
-                                y as f64,
+                                x as f64 / image_size as f64 - 1.,
+                                y as f64 / image_size as f64 - 1.,
                                 (x as f64 / 4.).sin() * (y as f64 / 4.).sin() * 0.5 + 0.5,
                             ]
                         })
                     })
                     .flatten()
                     .collect();
-                Ok((Matrix::from_slice(&data), Some([IMAGE_WIDTH; 2])))
+                Ok((Matrix::from_slice(&data), Some([image_width; 2])))
             }
             Self::FileImage => {
                 let img = ImageReader::open(file_name)?.decode()?.into_luma8();
@@ -83,29 +85,31 @@ impl FitModel {
                 ))
             }
             Self::RaytraceImage => {
-                let buf = &render_main();
-                let data: Vec<_> = (-IMAGE_HALFWIDTH..=IMAGE_HALFWIDTH)
+                let image_size_i = image_size as i32;
+                let image_width = image_size as usize * 2 + 1;
+                let buf = &render_main(image_width);
+                let data: Vec<_> = (-image_size_i..=image_size_i)
                     .map(|y| {
-                        (-IMAGE_HALFWIDTH..=IMAGE_HALFWIDTH).map(move |x| {
-                            let ux = (x + IMAGE_HALFWIDTH) as usize;
-                            let uy = (y + IMAGE_HALFWIDTH) as usize;
+                        (-image_size_i..=image_size_i).map(move |x| {
+                            let ux = (x + image_size_i) as usize;
+                            let uy = (y + image_size_i) as usize;
                             [
-                                x as f64,
-                                y as f64,
+                                x as f64 / image_size_i as f64 - 1.,
+                                y as f64 / image_size_i as f64 - 1.,
                                 // (x as f64 / 4.).sin() * (y as f64 / 4.).sin() * 0.5 + 0.5,
-                                buf[uy * IMAGE_WIDTH + ux as usize] as f64,
+                                buf[uy * image_width + ux as usize] as f64,
                             ]
                         })
                     })
                     .flatten()
                     .collect();
-                Ok((Matrix::from_slice(&data), Some([IMAGE_WIDTH; 2])))
+                Ok((Matrix::from_slice(&data), Some([image_width; 2])))
             }
         }
     }
 }
 
-fn render_main() -> Vec<f32> {
+fn render_main(image_width: usize) -> Vec<f32> {
     let mut materials: HashMap<String, Arc<RenderMaterial>> = HashMap::new();
 
     fn bg(_env: &RenderEnv, _pos: &Vec3) -> RenderColor {
@@ -115,13 +119,13 @@ fn render_main() -> Vec<f32> {
     let floor_material = Arc::new(
         RenderMaterial::new(
             "floor".to_string(),
-            RenderColor::new(1.0, 1.0, 0.0),
+            RenderColor::new(0.75, 1.0, 0.0),
             RenderColor::new(0.0, 0.0, 0.0),
             0,
             0.,
             0.0,
         )
-        .pattern(RenderPattern::RepeatedGradation)
+        .pattern(RenderPattern::Solid)
         .pattern_scale(300.)
         .pattern_angle_scale(0.2)
         .texture_ok("bar.png"),
@@ -154,14 +158,11 @@ fn render_main() -> Vec<f32> {
 
     let objects: Vec<RenderObject> = vec![
         /* Plane */
-        RenderObject::Floor(
-            RenderFloor::new_raw(
-                materials.get("floor").unwrap().clone(),
-                Vec3::new(0.0, -150.0, 0.0),
-                Vec3::new(0., 1., 0.),
-            )
-            .uvmap(UVMap::ZX),
-        ),
+        RenderObject::Floor(RenderFloor::new_raw(
+            materials.get("floor").unwrap().clone(),
+            Vec3::new(0.0, -150.0, 0.0),
+            Vec3::new(0., 1., 0.),
+        )),
         // RenderFloor::new (floor_material,       Vec3::new(-300.0,   0.0,  0.0),  Vec3::new(1., 0., 0.)),
         /* Spheres */
         // RenderSphere::new(mirror_material.clone(), 80.0, Vec3::new(0.0, -30.0, 172.0)),
@@ -178,8 +179,8 @@ fn render_main() -> Vec<f32> {
     let render_env = RenderEnv::new(
         Vec3::new(0., 2., -100.),
         Vec3::new(PI / 12., -PI / 2., -PI / 2.), /* pyr */
-        IMAGE_WIDTH as i32,
-        IMAGE_WIDTH as i32,
+        image_width as i32,
+        image_width as i32,
         1.,
         1.,
         bg,
@@ -187,10 +188,10 @@ fn render_main() -> Vec<f32> {
     .materials(materials)
     .objects(objects)
     .light(Vec3::new(50., 60., -50.));
-    let mut buf = vec![0.; IMAGE_WIDTH * IMAGE_WIDTH];
+    let mut buf = vec![0.; image_width * image_width];
     render(
         &render_env,
-        &mut |x, y, color| buf[y as usize * IMAGE_WIDTH + x as usize] = color.r,
+        &mut |x, y, color| buf[y as usize * image_width + x as usize] = color.r,
         1,
     );
     buf

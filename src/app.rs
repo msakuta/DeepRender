@@ -12,7 +12,7 @@ use rand::seq::SliceRandom;
 use crate::{
     activation::ActivationFn,
     bg_image::BgImage,
-    fit_model::{FitModel, ImageSize},
+    fit_model::{FitModel, ImageSize, IMAGE_HALFWIDTH},
     matrix::Matrix,
     model::Model,
     optimizer::OptimizerType,
@@ -28,6 +28,8 @@ enum TrainBatch {
 pub struct DeepRenderApp {
     fit_model: FitModel,
     file_name: String,
+    /// Image size used in synthesized images. FileImage should read size from file.
+    synth_image_size: i32,
     train: Matrix,
     train_batch: TrainBatch,
     batch_size: usize,
@@ -54,7 +56,7 @@ impl DeepRenderApp {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let fit_model = FitModel::Xor;
         let file_name = "alan.jpg".to_string();
-        let (train, image_size) = fit_model.train_data(&file_name).unwrap();
+        let (train, image_size) = fit_model.train_data(&file_name, IMAGE_HALFWIDTH).unwrap();
         let hidden_layers = 1;
         let mut arch = vec![train.cols() - 1];
         for _ in 0..hidden_layers {
@@ -67,6 +69,7 @@ impl DeepRenderApp {
         Self {
             fit_model: FitModel::Xor,
             file_name,
+            synth_image_size: IMAGE_HALFWIDTH,
             train,
             train_batch: TrainBatch::Sequence,
             batch_size: 1,
@@ -89,7 +92,10 @@ impl DeepRenderApp {
     }
 
     fn reset(&mut self) {
-        (self.train, self.image_size) = self.fit_model.train_data(&self.file_name).unwrap();
+        (self.train, self.image_size) = self
+            .fit_model
+            .train_data(&self.file_name, self.synth_image_size)
+            .unwrap();
         let mut arch = vec![self.train.cols() - 1];
         for _ in 0..self.hidden_layers {
             arch.push(self.hidden_nodes);
@@ -259,8 +265,6 @@ impl DeepRenderApp {
                 ui.radio_value(&mut self.fit_model, FitModel::FileImage, "FileImage");
             });
 
-            ui.radio_value(&mut self.fit_model, FitModel::RaytraceImage, "RaycastImage");
-
             ui.horizontal(|ui| {
                 ui.label("File name:");
                 ui.add_enabled(
@@ -268,6 +272,16 @@ impl DeepRenderApp {
                     TextEdit::singleline(&mut self.file_name),
                 );
             });
+
+            ui.radio_value(&mut self.fit_model, FitModel::RaytraceImage, "RaycastImage");
+
+            ui.horizontal(|ui| {
+                ui.label("Image size:");
+                ui.add_enabled(
+                    matches!(self.fit_model, FitModel::RaytraceImage),
+                    egui::widgets::Slider::new(&mut self.synth_image_size, 8..=20),
+                );
+            })
         });
 
         ui.horizontal(|ui| {
