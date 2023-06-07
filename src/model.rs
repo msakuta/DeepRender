@@ -109,7 +109,10 @@ impl Model {
                     diff[(i, j)] = diff_sum;
                 }
             }
-            *weights += self.optimizer.apply(l, &diff).scale(rate);
+            *weights += self
+                .optimizer
+                .apply(l, &diff)
+                .scale(rate / samples.rows() as f64);
             let loss_derived = loss.elementwise_mul(&interm_derived);
             loss = &loss_derived * &weights.t().cols_range(0, weights.rows() - 1);
         }

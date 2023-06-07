@@ -30,6 +30,7 @@ pub struct DeepRenderApp {
     file_name: String,
     train: Matrix,
     train_batch: TrainBatch,
+    batch_size: usize,
     image_size: Option<ImageSize>,
     hidden_layers: usize,
     hidden_nodes: usize,
@@ -68,6 +69,7 @@ impl DeepRenderApp {
             file_name,
             train,
             train_batch: TrainBatch::Sequence,
+            batch_size: 1,
             image_size,
             hidden_layers,
             hidden_nodes: 2,
@@ -103,15 +105,27 @@ impl DeepRenderApp {
         let rate = (10.0f64).powf(self.rate);
         match self.train_batch {
             TrainBatch::Sequence => {
-                for sample in self.train.iter_rows() {
-                    self.model.learn(rate, &Matrix::new_row(sample));
+                let batches = (self.train.rows() + self.batch_size - 1) / self.batch_size;
+                for i in 0..batches {
+                    let train = self.train.row_range(
+                        i * self.batch_size,
+                        ((i + 1) * self.batch_size).min(self.train.rows()),
+                    );
+                    self.model.learn(rate, &train);
                 }
             }
             TrainBatch::Shuffle => {
+                let batches = (self.train.rows() + self.batch_size - 1) / self.batch_size;
                 let mut order: Vec<_> = (0..self.train.rows()).collect();
                 order.shuffle(&mut rand::thread_rng());
-                for i in order {
-                    self.model.learn(rate, &Matrix::new_row(self.train.row(i)));
+                for i in 0..batches {
+                    let start = i * self.batch_size;
+                    let end = ((i + 1) * self.batch_size).min(self.train.rows());
+                    let mut train = Matrix::zeros(end - start, self.train.cols());
+                    for j in start..end {
+                        train.row_mut(j - start).copy_from_slice(self.train.row(j));
+                    }
+                    self.model.learn(rate, &train);
                 }
             }
             TrainBatch::Full => self.model.learn(rate, &self.train),
@@ -267,11 +281,18 @@ impl DeepRenderApp {
             ui.radio_value(&mut self.optimizer, OptimizerType::Adam, "Adam");
         });
 
-        ui.horizontal(|ui| {
-            ui.label("Train batch: ");
-            ui.radio_value(&mut self.train_batch, TrainBatch::Sequence, "Sequence");
-            ui.radio_value(&mut self.train_batch, TrainBatch::Shuffle, "Shuffle");
-            ui.radio_value(&mut self.train_batch, TrainBatch::Full, "Full");
+        ui.group(|ui| {
+            ui.horizontal(|ui| {
+                ui.label("Train batch: ");
+                ui.radio_value(&mut self.train_batch, TrainBatch::Sequence, "Sequence");
+                ui.radio_value(&mut self.train_batch, TrainBatch::Shuffle, "Shuffle");
+                ui.radio_value(&mut self.train_batch, TrainBatch::Full, "Full");
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Batch size:");
+                ui.add(egui::Slider::new(&mut self.batch_size, 1..=100));
+            })
         });
 
         ui.group(|ui| {

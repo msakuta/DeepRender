@@ -127,8 +127,27 @@ impl Matrix {
         self.cols
     }
 
+    pub(crate) fn row_range(&self, start: usize, end: usize) -> Matrix {
+        let rows = end - start;
+        let mut v = vec![0.; self.cols * rows];
+        for r in start..end {
+            for c in 0..self.cols {
+                v[(r - start) * self.cols + c] = self.v[r * self.cols + c];
+            }
+        }
+        Self {
+            rows,
+            cols: self.cols,
+            v,
+        }
+    }
+
     pub(crate) fn row(&self, r: usize) -> &[f64] {
         &self.v[r * self.cols..(r + 1) * self.cols]
+    }
+
+    pub(crate) fn row_mut(&mut self, r: usize) -> &mut [f64] {
+        &mut self.v[r * self.cols..(r + 1) * self.cols]
     }
 
     pub(crate) fn cols_range(&self, start: usize, end: usize) -> Matrix {
