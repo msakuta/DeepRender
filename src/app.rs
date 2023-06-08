@@ -12,7 +12,7 @@ use rand::seq::SliceRandom;
 use crate::{
     activation::ActivationFn,
     bg_image::BgImage,
-    fit_model::{FitModel, ImageSize, IMAGE_HALFWIDTH},
+    fit_model::{FitModel, ImageSize, ANGLES, IMAGE_HALFWIDTH},
     matrix::Matrix,
     model::Model,
     optimizer::OptimizerType,
@@ -27,6 +27,7 @@ enum TrainBatch {
 
 pub struct DeepRenderApp {
     fit_model: FitModel,
+    current_fit_model: FitModel,
     file_name: String,
     /// Image size used in synthesized images. FileImage should read size from file.
     synth_image_size: i32,
@@ -46,6 +47,7 @@ pub struct DeepRenderApp {
     plot_network: bool,
     plot_weights: bool,
     print_weights: bool,
+    angle: i32,
 
     // Widgets
     img: BgImage,
@@ -67,7 +69,8 @@ impl DeepRenderApp {
         let optimizer = OptimizerType::Steepest;
         let model = Model::new(&arch, activation_fn, optimizer.instantiate(&arch));
         Self {
-            fit_model: FitModel::Xor,
+            fit_model,
+            current_fit_model: fit_model,
             file_name,
             synth_image_size: IMAGE_HALFWIDTH,
             train,
@@ -86,12 +89,14 @@ impl DeepRenderApp {
             plot_network: true,
             plot_weights: true,
             print_weights: true,
+            angle: 0,
             img: BgImage::new(),
             img_predict: BgImage::new(),
         }
     }
 
     fn reset(&mut self) {
+        self.current_fit_model = self.fit_model;
         (self.train, self.image_size) = self
             .fit_model
             .train_data(&self.file_name, self.synth_image_size)
@@ -273,12 +278,20 @@ impl DeepRenderApp {
                 );
             });
 
-            ui.radio_value(&mut self.fit_model, FitModel::RaytraceImage, "RaycastImage");
+            ui.radio_value(
+                &mut self.fit_model,
+                FitModel::RaytraceImage,
+                "RaytraceImage",
+            );
+            ui.radio_value(&mut self.fit_model, FitModel::Raytrace3D, "Raytrace3D");
 
             ui.horizontal(|ui| {
                 ui.label("Image size:");
                 ui.add_enabled(
-                    matches!(self.fit_model, FitModel::RaytraceImage),
+                    matches!(
+                        self.fit_model,
+                        FitModel::RaytraceImage | FitModel::Raytrace3D
+                    ),
                     egui::widgets::Slider::new(&mut self.synth_image_size, 8..=20),
                 );
             })
@@ -376,6 +389,16 @@ impl DeepRenderApp {
     }
 
     fn image_plot(&mut self, ui: &mut Ui) {
+        ui.horizontal(|ui| {
+            ui.label("Angle");
+            if ui
+                .add(egui::widgets::Slider::new(&mut self.angle, 0..=ANGLES - 1))
+                .changed()
+            {
+                self.img.clear();
+            }
+        });
+
         Frame::canvas(ui.style()).show(ui, |ui| {
             let (response, painter) =
                 ui.allocate_painter(ui.available_size(), egui::Sense::hover());
@@ -384,42 +407,90 @@ impl DeepRenderApp {
                 return;
             };
 
-            self.img.paint(
-                &response,
-                &painter,
-                &self.train,
-                |train: &Matrix| {
-                    let image = (0..train.rows())
-                        .map(|i| {
-                            [(train.flat()[i * train.cols() + 2] * 255.)
-                                .max(0.)
-                                .min(255.) as u8; 3]
-                        })
-                        .flatten()
-                        .collect::<Vec<_>>();
-                    egui::ColorImage::from_rgb(image_size, &image)
-                },
-                [5., 5.],
-            );
+            match self.current_fit_model {
+                FitModel::Raytrace3D => {
+                    if let Some(image_size) = self.image_size {
+                        let angle_stride = image_size[0] * image_size[1];
+                        let angle = self.angle as usize;
+                        let rows = self.train.rows();
+                        self.img.paint(
+                            &response,
+                            &painter,
+                            &self.train,
+                            |train: &Matrix| {
+                                let image = (0..angle_stride)
+                                    .map(|i| {
+                                        [(train[(angle * angle_stride + i, 3)] * 255.)
+                                            .max(0.)
+                                            .min(255.)
+                                            as u8; 3]
+                                    })
+                                    .flatten()
+                                    .collect::<Vec<_>>();
+                                egui::ColorImage::from_rgb(image_size, &image)
+                            },
+                            [5., 5.],
+                        );
 
-            self.img_predict.clear();
-            self.img_predict.paint(
-                &response,
-                &painter,
-                (&self.train, &self.model),
-                |(train, model): (&Matrix, &Model)| {
-                    let image = (0..train.rows())
-                        .map(|i| {
-                            let sample = train.row(i);
-                            let predict = model.predict(sample);
-                            [(predict[(0, 0)] * 255.).max(0.).min(255.) as u8; 3]
-                        })
-                        .flatten()
-                        .collect::<Vec<_>>();
-                    egui::ColorImage::from_rgb(image_size, &image)
-                },
-                [image_size[0] as f32 + 10., 5.],
-            );
+                        self.img_predict.clear();
+                        self.img_predict.paint(
+                            &response,
+                            &painter,
+                            (&self.train, &self.model),
+                            |(train, model): (&Matrix, &Model)| {
+                                let image = (0..angle_stride)
+                                    .map(|i| {
+                                        let sample = train.row((angle * angle_stride + i) as usize);
+                                        let predict = model.predict(sample);
+                                        [(predict[(0, 0)] * 255.).max(0.).min(255.) as u8; 3]
+                                    })
+                                    .flatten()
+                                    .collect::<Vec<_>>();
+                                egui::ColorImage::from_rgb(image_size, &image)
+                            },
+                            [image_size[0] as f32 + 10., 5.],
+                        );
+                    }
+                }
+                _ => {
+                    self.img.paint(
+                        &response,
+                        &painter,
+                        &self.train,
+                        |train: &Matrix| {
+                            let image = (0..train.rows())
+                                .map(|i| {
+                                    [(train.flat()[i * train.cols() + 2] * 255.)
+                                        .max(0.)
+                                        .min(255.) as u8; 3]
+                                })
+                                .flatten()
+                                .collect::<Vec<_>>();
+                            egui::ColorImage::from_rgb(image_size, &image)
+                        },
+                        [5., 5.],
+                    );
+
+                    self.img_predict.clear();
+                    self.img_predict.paint(
+                        &response,
+                        &painter,
+                        (&self.train, &self.model),
+                        |(train, model): (&Matrix, &Model)| {
+                            let image = (0..train.rows())
+                                .map(|i| {
+                                    let sample = train.row(i);
+                                    let predict = model.predict(sample);
+                                    [(predict[(0, 0)] * 255.).max(0.).min(255.) as u8; 3]
+                                })
+                                .flatten()
+                                .collect::<Vec<_>>();
+                            egui::ColorImage::from_rgb(image_size, &image)
+                        },
+                        [image_size[0] as f32 + 10., 5.],
+                    );
+                }
+            }
         });
     }
 }
@@ -468,7 +539,7 @@ impl eframe::App for DeepRenderApp {
                     .default_height(125.)
                     .show(ctx, |ui| self.func_plot(ui));
             }
-            3 => {
+            3 | 4 => {
                 egui::TopBottomPanel::bottom("image_plot")
                     .resizable(true)
                     .min_height(100.)

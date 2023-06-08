@@ -2016,7 +2016,7 @@ checksum = "f2ff9a1f06a88b01621b7ae906ef0211290d1c8a168a15542486a8f61c0833b9"
 [[package]]
 name = "ray-rust"
 version = "0.1.0"
-source = "git+https://github.com/msakuta/ray-rust.git#f9024c4a27f5000f74fbd29129ab2dd680df4fe9"
+source = "git+https://github.com/msakuta/ray-rust.git#983afa894d005f353452d718a035e5f41f5daeef"
 dependencies = [
  "anyhow",
  "clap",
