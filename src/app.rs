@@ -320,9 +320,11 @@ impl DeepRenderApp {
 
             ui.horizontal(|ui| {
                 ui.label("Batch size:");
+                // There is no real point having more than 50 batches.
+                let max_batches = self.train.rows().min(50);
                 ui.add_enabled(
                     !matches!(self.train_batch, TrainBatch::Full),
-                    egui::Slider::new(&mut self.batch_size, 1..=self.train.rows()),
+                    egui::Slider::new(&mut self.batch_size, 1..=max_batches),
                 );
             })
         });
