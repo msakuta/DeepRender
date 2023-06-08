@@ -22,6 +22,7 @@ impl BgImage {
         app_data: T,
         img_getter: impl Fn(T) -> egui::ColorImage,
         origin: [f32; 2],
+        scale: f32,
     ) {
         let texture: &egui::TextureHandle = self.texture.get_or_insert_with(|| {
             let image = img_getter(app_data);
@@ -41,9 +42,8 @@ impl BgImage {
             response.rect,
         );
 
-        let scale = 5.;
         let size = texture.size_vec2() * scale;
-        let min = Vec2::new(origin[0] as f32, origin[1] as f32) * scale;
+        let min = Vec2::new(origin[0] as f32, origin[1] as f32);
         let max = min + size;
         let rect = Rect {
             min: min.to_pos2(),

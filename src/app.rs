@@ -47,7 +47,8 @@ pub struct DeepRenderApp {
     plot_network: bool,
     plot_weights: bool,
     print_weights: bool,
-    angle: i32,
+    angle: f64,
+    upsample: usize,
 
     // Widgets
     img: BgImage,
@@ -89,7 +90,8 @@ impl DeepRenderApp {
             plot_network: true,
             plot_weights: true,
             print_weights: true,
-            angle: 0,
+            angle: 0.,
+            upsample: 1,
             img: BgImage::new(),
             img_predict: BgImage::new(),
         }
@@ -292,7 +294,7 @@ impl DeepRenderApp {
                         self.fit_model,
                         FitModel::RaytraceImage | FitModel::Raytrace3D
                     ),
-                    egui::widgets::Slider::new(&mut self.synth_image_size, 8..=20),
+                    egui::widgets::Slider::new(&mut self.synth_image_size, 8..=30),
                 );
             })
         });
@@ -392,13 +394,19 @@ impl DeepRenderApp {
 
     fn image_plot(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {
-            ui.label("Angle");
+            ui.label("Angle:");
             if ui
-                .add(egui::widgets::Slider::new(&mut self.angle, 0..=ANGLES - 1))
+                .add(egui::widgets::Slider::new(
+                    &mut self.angle,
+                    (0.)..=(ANGLES - 1) as f64,
+                ))
                 .changed()
             {
                 self.img.clear();
             }
+
+            ui.label("Upsample:");
+            ui.add(egui::widgets::Slider::new(&mut self.upsample, 1..=4));
         });
 
         Frame::canvas(ui.style()).show(ui, |ui| {
@@ -411,48 +419,54 @@ impl DeepRenderApp {
 
             match self.current_fit_model {
                 FitModel::Raytrace3D => {
-                    if let Some(image_size) = self.image_size {
-                        let angle_stride = image_size[0] * image_size[1];
-                        let angle = self.angle as usize;
-                        let rows = self.train.rows();
-                        self.img.paint(
-                            &response,
-                            &painter,
-                            &self.train,
-                            |train: &Matrix| {
-                                let image = (0..angle_stride)
-                                    .map(|i| {
-                                        [(train[(angle * angle_stride + i, 3)] * 255.)
-                                            .max(0.)
-                                            .min(255.)
-                                            as u8; 3]
-                                    })
-                                    .flatten()
-                                    .collect::<Vec<_>>();
-                                egui::ColorImage::from_rgb(image_size, &image)
-                            },
-                            [5., 5.],
-                        );
+                    let angle_stride = image_size[0] * image_size[1];
+                    let angle = self.angle as usize;
+                    self.img.paint(
+                        &response,
+                        &painter,
+                        &self.train,
+                        |train: &Matrix| {
+                            let image = (0..angle_stride)
+                                .map(|i| {
+                                    let b = (train[(angle * angle_stride + i, 3)] * 255.)
+                                        .max(0.)
+                                        .min(255.);
+                                    [b as u8; 3]
+                                })
+                                .flatten()
+                                .collect::<Vec<_>>();
+                            egui::ColorImage::from_rgb(image_size, &image)
+                        },
+                        [25., 25.],
+                        5.,
+                    );
 
-                        self.img_predict.clear();
-                        self.img_predict.paint(
-                            &response,
-                            &painter,
-                            (&self.train, &self.model),
-                            |(train, model): (&Matrix, &Model)| {
-                                let image = (0..angle_stride)
-                                    .map(|i| {
-                                        let sample = train.row((angle * angle_stride + i) as usize);
-                                        let predict = model.predict(sample);
-                                        [(predict[(0, 0)] * 255.).max(0.).min(255.) as u8; 3]
-                                    })
-                                    .flatten()
-                                    .collect::<Vec<_>>();
-                                egui::ColorImage::from_rgb(image_size, &image)
-                            },
-                            [image_size[0] as f32 + 10., 5.],
-                        );
-                    }
+                    let image_upsize =
+                        [image_size[0] * self.upsample, image_size[1] * self.upsample];
+
+                    self.img_predict.clear();
+                    self.img_predict.paint(
+                        &response,
+                        &painter,
+                        (&self.train, &self.model),
+                        |(train, model): (&Matrix, &Model)| {
+                            let image = (0..angle_stride * self.upsample * self.upsample)
+                                .map(|i| {
+                                    let x =
+                                        (i % image_upsize[0]) as f64 / image_upsize[0] as f64 - 0.5;
+                                    let y =
+                                        (i / image_upsize[0]) as f64 / image_upsize[1] as f64 - 0.5;
+                                    let sample = [x, y, self.angle / ANGLES as f64 - 0.5];
+                                    let predict = model.predict(&sample);
+                                    [(predict[(0, 0)] * 255.).max(0.).min(255.) as u8; 3]
+                                })
+                                .flatten()
+                                .collect::<Vec<_>>();
+                            egui::ColorImage::from_rgb(image_upsize, &image)
+                        },
+                        [image_size[0] as f32 * 5. + 50., 25.],
+                        5. / self.upsample as f32,
+                    );
                 }
                 _ => {
                     self.img.paint(
@@ -470,7 +484,8 @@ impl DeepRenderApp {
                                 .collect::<Vec<_>>();
                             egui::ColorImage::from_rgb(image_size, &image)
                         },
-                        [5., 5.],
+                        [25., 25.],
+                        5.,
                     );
 
                     self.img_predict.clear();
@@ -489,7 +504,8 @@ impl DeepRenderApp {
                                 .collect::<Vec<_>>();
                             egui::ColorImage::from_rgb(image_size, &image)
                         },
-                        [image_size[0] as f32 + 10., 5.],
+                        [image_size[0] as f32 * 5. + 50., 25.],
+                        5.,
                     );
                 }
             }

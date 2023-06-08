@@ -110,23 +110,20 @@ impl FitModel {
                 Ok((Matrix::from_slice(&data), Some([image_width; 2])))
             }
             Self::Raytrace3D => {
-                let image_size_i = image_size as i32;
-                let image_width = image_size as usize * 2 + 1;
-                let buf = &render3d_main(image_width, ANGLES as usize);
+                let image_size_u = image_size as usize;
+                let buf = &render3d_main(image_size_u, ANGLES as usize);
                 let data: Vec<_> = (0..ANGLES)
                     .map(|angle| {
-                        let angle_offset = angle as usize * image_width * image_width;
-                        (-image_size_i..=image_size_i)
+                        let angle_offset = angle as usize * image_size_u * image_size_u;
+                        (0..image_size_u)
                             .map(move |y| {
-                                (-image_size_i..=image_size_i).map(move |x| {
-                                    let ux = (x + image_size_i) as usize;
-                                    let uy = (y + image_size_i) as usize;
+                                (0..image_size_u).map(move |x| {
                                     [
-                                        x as f64 / image_size_i as f64 - 1.,
-                                        y as f64 / image_size_i as f64 - 1.,
+                                        x as f64 / image_size as f64 - 0.5,
+                                        y as f64 / image_size as f64 - 0.5,
                                         angle as f64 / ANGLES as f64 - 0.5,
                                         // (x as f64 / 4.).sin() * (y as f64 / 4.).sin() * 0.5 + 0.5,
-                                        buf[angle_offset + uy * image_width + ux as usize] as f64,
+                                        buf[angle_offset + y * image_size_u + x] as f64,
                                     ]
                                 })
                             })
@@ -134,7 +131,7 @@ impl FitModel {
                     })
                     .flatten()
                     .collect();
-                Ok((Matrix::from_slice(&data), Some([image_width; 2])))
+                Ok((Matrix::from_slice(&data), Some([image_size_u; 2])))
             }
         }
     }

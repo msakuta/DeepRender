@@ -9,11 +9,27 @@ Therefore, you can fit it to any function, including sine wave, given enough neu
 
 ![](images/screenshot.png)
 
+Training process:
+
+![](https://msakuta.github.io/images/showcase/DeepRender.gif)
+
 ## An example of training on an image
 
 You can train the network to imitate an image!
 
 ![](images/screenshot02.png)
+
+
+## An example of training 3D renderer
+
+Training process:
+
+![Training process](https://msakuta.github.io/images/showcase/DeepRender3DTrain.gif)
+
+Result:
+
+![Result](https://msakuta.github.io/images/showcase/DeepRender3DResult.gif)
+
 
 # What's this?
 
