@@ -304,6 +304,7 @@ impl DeepRenderApp {
             ui.radio_value(&mut self.activation_fn, ActivationFn::Sigmoid, "Sigmoid");
             ui.radio_value(&mut self.activation_fn, ActivationFn::Relu, "ReLU");
             ui.radio_value(&mut self.activation_fn, ActivationFn::Silu, "SiLU");
+            ui.radio_value(&mut self.activation_fn, ActivationFn::Sin, "Sin");
         });
 
         ui.horizontal(|ui| {

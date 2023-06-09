@@ -28,11 +28,20 @@ fn silu_derive(x: f64) -> f64 {
     sigmoid_x * (1. + (1. - sigmoid_x))
 }
 
+fn sin(x: f64) -> f64 {
+    x.sin() * 0.5 + 0.5
+}
+
+fn sin_derive(x: f64) -> f64 {
+    x.cos() * 0.5
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ActivationFn {
     Sigmoid,
     Relu,
     Silu,
+    Sin,
 }
 
 impl ActivationFn {
@@ -41,6 +50,7 @@ impl ActivationFn {
             Self::Sigmoid => sigmoid,
             Self::Relu => relu,
             Self::Silu => silu,
+            Self::Sin => sin,
         }
     }
 
@@ -49,6 +59,7 @@ impl ActivationFn {
             Self::Sigmoid => sigmoid_derive,
             Self::Relu => relu_derive,
             Self::Silu => silu_derive,
+            Self::Sin => sin_derive,
         }
     }
 
@@ -56,7 +67,7 @@ impl ActivationFn {
         match self {
             Self::Sigmoid => 1.,
             Self::Relu => 1.,
-            Self::Silu => 1.,
+            _ => 1.,
         }
     }
 }
