@@ -1,4 +1,7 @@
-use crate::matrix::Matrix;
+use crate::{
+    matrix::Matrix,
+    sampler::{MatrixSampler, Sampler},
+};
 use ray_rust::{
     quat::Quat,
     render::{
@@ -35,20 +38,21 @@ impl FitModel {
         &self,
         file_name: &impl AsRef<Path>,
         image_size: i32,
-    ) -> Result<(Matrix, Option<ImageSize>), Box<dyn std::error::Error>> {
+    ) -> Result<(Box<dyn Sampler>, Option<ImageSize>), Box<dyn std::error::Error>> {
         match self {
             Self::Xor => {
                 // let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 1.]];
                 // let train = [[0., 0., 0.], [0., 1., 0.], [1., 0., 0.], [1., 1., 1.]];
                 let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
                 // let train = [[0., 0., 0.], [0., 1., 1.], [1., 0., 0.], [1., 1., 1.]];
-                Ok((Matrix::new(train), None))
+                Ok((Box::new(MatrixSampler::new(Matrix::new(train))), None))
             }
             Self::Sine => {
                 let data: Vec<_> = (-50..=50)
                     .map(|f| [f as f64 / 50., (f as f64 / 4.).sin() * 0.5 + 0.5])
                     .collect();
-                Ok((Matrix::from_slice(&data), None))
+                let sampler = Box::new(MatrixSampler::new(Matrix::from_slice(&data)));
+                Ok((sampler, None))
             }
             Self::SynthImage => {
                 let image_size_i = image_size as i32;
@@ -65,7 +69,8 @@ impl FitModel {
                     })
                     .flatten()
                     .collect();
-                Ok((Matrix::from_slice(&data), Some([image_width; 2])))
+                let sampler = Box::new(MatrixSampler::new(Matrix::from_slice(&data)));
+                Ok((sampler, Some([image_width; 2])))
             }
             Self::FileImage => {
                 let img = ImageReader::open(file_name)?.decode()?.into_luma8();
@@ -83,10 +88,8 @@ impl FitModel {
                         ]
                     })
                     .collect();
-                Ok((
-                    Matrix::from_slice(&data),
-                    Some([width as usize, height as usize]),
-                ))
+                let sampler = Box::new(MatrixSampler::new(Matrix::from_slice(&data)));
+                Ok((sampler, Some([width as usize, height as usize])))
             }
             Self::RaytraceImage => {
                 let image_size_i = image_size as i32;
@@ -107,7 +110,8 @@ impl FitModel {
                     })
                     .flatten()
                     .collect();
-                Ok((Matrix::from_slice(&data), Some([image_width; 2])))
+                let sampler = Box::new(MatrixSampler::new(Matrix::from_slice(&data)));
+                Ok((sampler, Some([image_width; 2])))
             }
             Self::Raytrace3D => {
                 let image_size_u = image_size as usize;
@@ -131,8 +135,17 @@ impl FitModel {
                     })
                     .flatten()
                     .collect();
-                Ok((Matrix::from_slice(&data), Some([image_size_u; 2])))
+                let sampler = Box::new(MatrixSampler::new(Matrix::from_slice(&data)));
+                Ok((sampler, Some([image_size_u; 2])))
             }
+        }
+    }
+
+    pub(crate) fn num_inputs(&self) -> usize {
+        match self {
+            Self::Sine => 1,
+            Self::Raytrace3D => 3,
+            _ => 2,
         }
     }
 }
