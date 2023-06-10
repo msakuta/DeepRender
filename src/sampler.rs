@@ -1,6 +1,14 @@
-use rand::seq::SliceRandom;
+use rand::{seq::SliceRandom, Rng};
+use ray_rust::{
+    quat::Quat,
+    render::{render, RenderEnv, RenderMaterial, RenderObject},
+    vec3::Vec3,
+};
 
-use crate::matrix::Matrix;
+use crate::{
+    fit_model::{angle_to_camera, render_scene},
+    matrix::Matrix,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum TrainBatch {
@@ -63,6 +71,58 @@ impl MatrixSampler {
         Self {
             train,
             order: vec![],
+        }
+    }
+}
+
+pub(crate) struct RaytraceSampler {
+    train: Matrix,
+
+    // Renderer params
+    // materials: HashMap<String, Arc<RenderMaterial>>,
+    render_env: RenderEnv,
+}
+
+impl Sampler for RaytraceSampler {
+    fn sample(&mut self, train_batch: TrainBatch, batch_size: usize) -> Matrix {
+        let mut rng = rand::thread_rng();
+        use std::f32::consts::PI;
+
+        let mut samples = Matrix::zeros(batch_size, 4);
+        for i in 0..batch_size {
+            let angle = rand::random::<f32>();
+            let angle_f = angle;
+            let (yaw, x, y) = angle_to_camera(angle_f);
+            self.render_env.camera.position.x = x;
+            self.render_env.camera.position.z = y;
+            self.render_env.camera.pyr.y = yaw;
+            let ray_x = rng.gen::<f32>() - 0.5;
+            let ray_y = rng.gen::<f32>() - 0.5;
+            self.render_env.camera.rotation = Quat::from_pyr(&self.render_env.camera.pyr)
+                * Quat::from_pyr(&Vec3::new(ray_y * PI / 2., ray_x * PI / 2., 0.));
+            samples[(i, 0)] = ray_x as f64;
+            samples[(i, 1)] = ray_y as f64;
+            samples[(i, 2)] = angle as f64 - 0.5;
+            render(
+                &self.render_env,
+                &mut |x, y, color| samples[(i, 3)] = color.r as f64,
+                1,
+            );
+        }
+        // println!("RaytraceSample: {samples:?}");
+        samples
+    }
+
+    fn full(&self) -> &Matrix {
+        &self.train
+    }
+}
+
+impl RaytraceSampler {
+    pub(crate) fn new(train: Matrix) -> Self {
+        Self {
+            train,
+            render_env: render_scene(1),
         }
     }
 }

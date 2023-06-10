@@ -330,7 +330,7 @@ impl DeepRenderApp {
                 ui.label("Trains per frame:");
                 ui.add(egui::widgets::Slider::new(
                     &mut self.trains_per_frame,
-                    1..=150,
+                    1..=1000,
                 ));
             });
         });
@@ -432,8 +432,8 @@ impl DeepRenderApp {
                     self.img_predict.paint(
                         &response,
                         &painter,
-                        (self.sampler.full(), &self.model),
-                        |(train, model): (&Matrix, &Model)| {
+                        &self.model,
+                        |model: &Model| {
                             let image = (0..angle_stride * self.upsample * self.upsample)
                                 .map(|i| {
                                     let x =

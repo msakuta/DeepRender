@@ -1,6 +1,6 @@
 use crate::{
     matrix::Matrix,
-    sampler::{MatrixSampler, Sampler},
+    sampler::{MatrixSampler, RaytraceSampler, Sampler},
 };
 use ray_rust::{
     quat::Quat,
@@ -135,7 +135,8 @@ impl FitModel {
                     })
                     .flatten()
                     .collect();
-                let sampler = Box::new(MatrixSampler::new(Matrix::from_slice(&data)));
+                // let sampler = Box::new(MatrixSampler::new(Matrix::from_slice(&data)));
+                let sampler = Box::new(RaytraceSampler::new(Matrix::from_slice(&data)));
                 Ok((sampler, Some([image_size_u; 2])))
             }
         }
@@ -238,7 +239,7 @@ fn render_main(image_width: usize) -> Vec<f32> {
     buf
 }
 
-fn render3d_main(image_width: usize, angles: usize) -> Vec<f32> {
+pub(crate) fn render_scene(image_size: usize) -> RenderEnv {
     let mut materials: HashMap<String, Arc<RenderMaterial>> = HashMap::new();
 
     fn bg(_env: &RenderEnv, _pos: &Vec3) -> RenderColor {
@@ -305,26 +306,40 @@ fn render3d_main(image_width: usize, angles: usize) -> Vec<f32> {
 
     use std::f32::consts::PI;
 
-    let mut render_env = RenderEnv::new(
+    RenderEnv::new(
         Vec3::new(0., 2., -150.),
         Vec3::new(PI / 12., -PI / 2., -PI / 2.), /* pyr */
-        image_width as i32,
-        image_width as i32,
+        image_size as i32,
+        image_size as i32,
         1.,
         1.,
         bg,
     )
     .materials(materials)
     .objects(objects)
-    .light(Vec3::new(50., 60., -50.));
+    .light(Vec3::new(50., 60., -50.))
+}
+
+pub(crate) fn angle_to_camera(angle_f: f32) -> (f32, f32, f32) {
+    use std::f32::consts::PI;
+    let angle_rad = angle_f * PI;
+    (
+        (-angle_f - 0.5) * PI,
+        angle_rad.sin() * 200.,
+        -angle_rad.cos() * 200.,
+    )
+}
+
+fn render3d_main(image_width: usize, angles: usize) -> Vec<f32> {
+    let mut render_env = render_scene(image_width);
     let angle_stride = image_width * image_width;
     let mut buf = vec![0.; angle_stride * image_width * image_width];
     for angle in 0..angles {
         let angle_f = angle as f32 / angles as f32;
-        let angle_rad = angle_f * PI / 2.;
-        render_env.camera.position.x = angle_rad.sin() * 200.;
-        render_env.camera.position.z = -angle_rad.cos() * 200.;
-        render_env.camera.pyr.y = (-angle_f - 1.) * PI / 2.;
+        let (yaw, x, y) = angle_to_camera(angle_f);
+        render_env.camera.position.x = x;
+        render_env.camera.position.z = y;
+        render_env.camera.pyr.y = yaw;
         render_env.camera.rotation = Quat::from_pyr(&render_env.camera.pyr);
         render(
             &render_env,
