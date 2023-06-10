@@ -32,6 +32,7 @@ pub struct DeepRenderApp {
     hidden_nodes: usize,
     model: Model,
     rate: f64,
+    trains_per_frame: usize,
     loss_history: Vec<f64>,
     weights_history: Vec<Vec<f64>>,
     activation_fn: ActivationFn,
@@ -75,6 +76,7 @@ impl DeepRenderApp {
             hidden_nodes: 2,
             model,
             rate: 0.,
+            trains_per_frame: 1,
             loss_history: vec![],
             weights_history: vec![],
             activation_fn,
@@ -109,10 +111,12 @@ impl DeepRenderApp {
 
     fn learn_iter(&mut self) {
         let rate = (10.0f64).powf(self.rate);
-        let samples = self.sampler.sample(self.train_batch, self.batch_size);
-        self.model.learn(rate, &samples);
-        self.loss_history.push(self.model.loss(self.sampler.full()));
-        self.add_weights_history();
+        for _ in 0..self.trains_per_frame {
+            let samples = self.sampler.sample(self.train_batch, self.batch_size);
+            self.model.learn(rate, &samples);
+            self.loss_history.push(self.model.loss(self.sampler.full()));
+            self.add_weights_history();
+        }
     }
 
     fn loss_history(&self) -> Line {
@@ -320,6 +324,13 @@ impl DeepRenderApp {
                 ui.add(egui::Slider::new(&mut self.rate, -10.0..=0.));
             });
             ui.label(format!("Descent rate: {}", (10.0f64).powf(self.rate)));
+            ui.horizontal(|ui| {
+                ui.label("Trains per frame:");
+                ui.add(egui::widgets::Slider::new(
+                    &mut self.trains_per_frame,
+                    1..=50,
+                ));
+            });
         });
 
         ui.checkbox(&mut self.plot_network, "Plot network");
