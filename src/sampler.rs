@@ -24,7 +24,6 @@ impl Sampler for MatrixSampler {
         match train_batch {
             TrainBatch::Sequence => {
                 if self.order.is_empty() {
-                    let batches = (self.train.rows() + batch_size - 1) / batch_size;
                     self.order = (0..self.train.rows()).collect();
                 }
                 let samples = batch_size.min(self.order.len());
@@ -38,7 +37,6 @@ impl Sampler for MatrixSampler {
             }
             TrainBatch::Shuffle => {
                 if self.order.is_empty() {
-                    let batches = (self.train.rows() + batch_size - 1) / batch_size;
                     self.order = (0..self.train.rows()).collect();
                     self.order.shuffle(&mut rand::thread_rng());
                 }

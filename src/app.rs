@@ -114,7 +114,9 @@ impl DeepRenderApp {
         for _ in 0..self.trains_per_frame {
             let samples = self.sampler.sample(self.train_batch, self.batch_size);
             self.model.learn(rate, &samples);
-            self.loss_history.push(self.model.loss(self.sampler.full()));
+        }
+        self.loss_history.push(self.model.loss(self.sampler.full()));
+        if self.plot_weights {
             self.add_weights_history();
         }
     }
@@ -328,7 +330,7 @@ impl DeepRenderApp {
                 ui.label("Trains per frame:");
                 ui.add(egui::widgets::Slider::new(
                     &mut self.trains_per_frame,
-                    1..=50,
+                    1..=150,
                 ));
             });
         });
