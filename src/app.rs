@@ -341,7 +341,10 @@ impl DeepRenderApp {
 
         ui.checkbox(&mut self.print_weights, "Print weights (uncheck for speed)");
 
-        ui.label(format!("Loss: {}", self.model.loss(self.sampler.full())));
+        ui.label(format!(
+            "Loss: {}",
+            self.loss_history.last().copied().unwrap_or(0.)
+        ));
 
         if self.print_weights {
             ui.label(format!("Model:\n{}", self.model));
