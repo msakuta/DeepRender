@@ -1,0 +1,41 @@
+name: Rust-wasm-deploy
+
+
+on:
+  push:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - uses: jetli/trunk-action@v0.4.0
+      with:
+        # Optional version of trunk to install(eg. 'v0.16.0', 'latest')
+        version: 'latest'
+
+    - name: Build with trunk
+      run: rustup target add wasm32-unknown-unknown && RUSTFLAGS='--cfg=web_sys_unstable_apis' trunk build --release --public-url deeprender
+    - name: Deploy
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./dist
+        force_orphan: true
+
+    # - name: Build
+    #   run: cd druid && wasm-pack build --target web
+    # - name: Copy static data
+    #   run: cd druid && cp index.html index.js pkg/ && rm pkg/.gitignore
+    # - name: Deploy
+    #   uses: peaceiris/actions-gh-pages@v3
+    #   with:
+    #     github_token: ${{ secrets.GITHUB_TOKEN }}
+    #     publish_dir: ./druid/pkg
