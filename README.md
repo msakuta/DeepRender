@@ -2,6 +2,8 @@
 
 An experimental Neural Network trainer/visualizer in Rust
 
+Try it on your browser! https://msakuta.github.io/DeepRender/
+
 ## Training on a function
 
 A neural network is a universal function approximator.
