@@ -22,7 +22,7 @@ jobs:
         version: 'latest'
 
     - name: Build with trunk
-      run: rustup target add wasm32-unknown-unknown && RUSTFLAGS='--cfg=web_sys_unstable_apis' trunk build --release --public-url deeprender
+      run: rustup target add wasm32-unknown-unknown && RUSTFLAGS='--cfg=web_sys_unstable_apis' trunk build --release --public-url DeepRender
     - name: Deploy
       uses: peaceiris/actions-gh-pages@v3
       with:
