@@ -1,7 +1,7 @@
 use rand::{seq::SliceRandom, Rng};
 use ray_rust::{
     quat::Quat,
-    render::{render, RenderEnv, RenderMaterial, RenderObject},
+    render::{render, RenderEnv},
     vec3::Vec3,
 };
 
@@ -84,7 +84,7 @@ pub(crate) struct RaytraceSampler {
 }
 
 impl Sampler for RaytraceSampler {
-    fn sample(&mut self, train_batch: TrainBatch, batch_size: usize) -> Matrix {
+    fn sample(&mut self, _train_batch: TrainBatch, batch_size: usize) -> Matrix {
         let mut rng = rand::thread_rng();
         use std::f32::consts::PI;
 
@@ -105,7 +105,7 @@ impl Sampler for RaytraceSampler {
             samples[(i, 2)] = angle as f64 - 0.5;
             render(
                 &self.render_env,
-                &mut |x, y, color| samples[(i, 3)] = color.r as f64,
+                &mut |_x, _y, color| samples[(i, 3)] = color.r as f64,
                 1,
             );
         }

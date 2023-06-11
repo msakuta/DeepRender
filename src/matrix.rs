@@ -35,6 +35,7 @@ impl Matrix {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn zeros_like(other: &Matrix) -> Self {
         Self {
             rows: other.rows,
@@ -85,6 +86,7 @@ impl Matrix {
         Self { rows, cols, v }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn eye(size: usize) -> Self {
         let mut v = vec![0.; size * size];
         for i in 0..size {
@@ -127,6 +129,7 @@ impl Matrix {
         self.cols
     }
 
+    #[allow(dead_code)]
     pub(crate) fn row_range(&self, start: usize, end: usize) -> Matrix {
         let rows = end - start;
         let mut v = vec![0.; self.cols * rows];
@@ -185,10 +188,12 @@ impl Matrix {
         (self.rows, self.cols)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn sum(&self) -> f64 {
         self.v.iter().fold(0., |acc, cur| acc + *cur)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn sum_col(&self) -> Matrix {
         let mut v = vec![0.; self.cols];
         for c in 0..self.cols {
