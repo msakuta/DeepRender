@@ -7,7 +7,6 @@ use eframe::{
     },
     epaint::{pos2, Color32, Pos2, Rect},
 };
-use rand::seq::SliceRandom;
 
 use crate::{
     activation::ActivationFn,
@@ -16,14 +15,8 @@ use crate::{
     matrix::Matrix,
     model::Model,
     optimizer::OptimizerType,
+    sampler::{Sampler, TrainBatch},
 };
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum TrainBatch {
-    Sequence,
-    Shuffle,
-    Full,
-}
 
 pub struct DeepRenderApp {
     fit_model: FitModel,
@@ -31,7 +24,7 @@ pub struct DeepRenderApp {
     file_name: String,
     /// Image size used in synthesized images. FileImage should read size from file.
     synth_image_size: i32,
-    train: Matrix,
+    sampler: Box<dyn Sampler>,
     train_batch: TrainBatch,
     batch_size: usize,
     image_size: Option<ImageSize>,
@@ -39,6 +32,7 @@ pub struct DeepRenderApp {
     hidden_nodes: usize,
     model: Model,
     rate: f64,
+    trains_per_frame: usize,
     loss_history: Vec<f64>,
     weights_history: Vec<Vec<f64>>,
     activation_fn: ActivationFn,
@@ -59,9 +53,9 @@ impl DeepRenderApp {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let fit_model = FitModel::Xor;
         let file_name = "alan.jpg".to_string();
-        let (train, image_size) = fit_model.train_data(&file_name, IMAGE_HALFWIDTH).unwrap();
+        let (sampler, image_size) = fit_model.train_data(&file_name, IMAGE_HALFWIDTH).unwrap();
         let hidden_layers = 1;
-        let mut arch = vec![train.cols() - 1];
+        let mut arch = vec![fit_model.num_inputs()];
         for _ in 0..hidden_layers {
             arch.push(2);
         }
@@ -74,7 +68,7 @@ impl DeepRenderApp {
             current_fit_model: fit_model,
             file_name,
             synth_image_size: IMAGE_HALFWIDTH,
-            train,
+            sampler,
             train_batch: TrainBatch::Sequence,
             batch_size: 1,
             image_size,
@@ -82,6 +76,7 @@ impl DeepRenderApp {
             hidden_nodes: 2,
             model,
             rate: 0.,
+            trains_per_frame: 1,
             loss_history: vec![],
             weights_history: vec![],
             activation_fn,
@@ -99,11 +94,11 @@ impl DeepRenderApp {
 
     fn reset(&mut self) {
         self.current_fit_model = self.fit_model;
-        (self.train, self.image_size) = self
+        (self.sampler, self.image_size) = self
             .fit_model
             .train_data(&self.file_name, self.synth_image_size)
             .unwrap();
-        let mut arch = vec![self.train.cols() - 1];
+        let mut arch = vec![self.fit_model.num_inputs()];
         for _ in 0..self.hidden_layers {
             arch.push(self.hidden_nodes);
         }
@@ -116,37 +111,14 @@ impl DeepRenderApp {
 
     fn learn_iter(&mut self) {
         let rate = (10.0f64).powf(self.rate);
-        match self.train_batch {
-            TrainBatch::Sequence => {
-                let batches = (self.train.rows() + self.batch_size - 1) / self.batch_size;
-                for i in 0..batches {
-                    let train = self.train.row_range(
-                        i * self.batch_size,
-                        ((i + 1) * self.batch_size).min(self.train.rows()),
-                    );
-                    self.model.learn(rate, &train);
-                }
-            }
-            TrainBatch::Shuffle => {
-                let batches = (self.train.rows() + self.batch_size - 1) / self.batch_size;
-                let mut order: Vec<_> = (0..self.train.rows()).collect();
-                order.shuffle(&mut rand::thread_rng());
-                for i in 0..batches {
-                    let start = i * self.batch_size;
-                    let end = ((i + 1) * self.batch_size).min(self.train.rows());
-                    let mut train = Matrix::zeros(end - start, self.train.cols());
-                    for j in start..end {
-                        train
-                            .row_mut(j - start)
-                            .copy_from_slice(self.train.row(order[j]));
-                    }
-                    self.model.learn(rate, &train);
-                }
-            }
-            TrainBatch::Full => self.model.learn(rate, &self.train),
+        for _ in 0..self.trains_per_frame {
+            let samples = self.sampler.sample(self.train_batch, self.batch_size);
+            self.model.learn(rate, &samples);
         }
-        self.loss_history.push(self.model.loss(&self.train));
-        self.add_weights_history();
+        self.loss_history.push(self.model.loss(self.sampler.full()));
+        if self.plot_weights {
+            self.add_weights_history();
+        }
     }
 
     fn loss_history(&self) -> Line {
@@ -326,7 +298,7 @@ impl DeepRenderApp {
             ui.horizontal(|ui| {
                 ui.label("Batch size:");
                 // There is no real point having more than 50 batches.
-                let max_batches = self.train.rows().min(50);
+                let max_batches = 50;
                 ui.add_enabled(
                     !matches!(self.train_batch, TrainBatch::Full),
                     egui::Slider::new(&mut self.batch_size, 1..=max_batches),
@@ -354,6 +326,13 @@ impl DeepRenderApp {
                 ui.add(egui::Slider::new(&mut self.rate, -10.0..=0.));
             });
             ui.label(format!("Descent rate: {}", (10.0f64).powf(self.rate)));
+            ui.horizontal(|ui| {
+                ui.label("Trains per frame:");
+                ui.add(egui::widgets::Slider::new(
+                    &mut self.trains_per_frame,
+                    1..=1000,
+                ));
+            });
         });
 
         ui.checkbox(&mut self.plot_network, "Plot network");
@@ -362,11 +341,14 @@ impl DeepRenderApp {
 
         ui.checkbox(&mut self.print_weights, "Print weights (uncheck for speed)");
 
-        ui.label(format!("Loss: {}", self.model.loss(&self.train)));
+        ui.label(format!(
+            "Loss: {}",
+            self.loss_history.last().copied().unwrap_or(0.)
+        ));
 
         if self.print_weights {
             ui.label(format!("Model:\n{}", self.model));
-            for sample in self.train.iter_rows() {
+            for sample in self.sampler.full().iter_rows() {
                 let predict = self.model.predict(sample);
                 ui.label(format!("{} -> {}", Matrix::new_row(&sample[0..2]), predict));
             }
@@ -376,8 +358,8 @@ impl DeepRenderApp {
     fn func_plot(&self, ui: &mut Ui) {
         let plot = Plot::new("plot");
         plot.legend(Legend::default()).show(ui, |plot_ui| {
-            let points: PlotPoints = self
-                .train
+            let train = self.sampler.full();
+            let points: PlotPoints = train
                 .iter_rows()
                 .map(|sample| [sample[0], sample[1]])
                 .collect();
@@ -385,8 +367,7 @@ impl DeepRenderApp {
                 .color(eframe::egui::Color32::from_rgb(0, 0, 255))
                 .name("Training");
             plot_ui.line(line);
-            let points: PlotPoints = self
-                .train
+            let points: PlotPoints = train
                 .iter_rows()
                 .map(|sample| [sample[0], self.model.predict(sample)[(0, 0)]])
                 .collect();
@@ -427,7 +408,7 @@ impl DeepRenderApp {
                     self.img.paint(
                         &response,
                         &painter,
-                        &self.train,
+                        self.sampler.full(),
                         |train: &Matrix| {
                             let image = (0..angle_stride)
                                 .map(|i| {
@@ -451,8 +432,8 @@ impl DeepRenderApp {
                     self.img_predict.paint(
                         &response,
                         &painter,
-                        (&self.train, &self.model),
-                        |(train, model): (&Matrix, &Model)| {
+                        &self.model,
+                        |model: &Model| {
                             let image = (0..angle_stride * self.upsample * self.upsample)
                                 .map(|i| {
                                     let x =
@@ -475,7 +456,7 @@ impl DeepRenderApp {
                     self.img.paint(
                         &response,
                         &painter,
-                        &self.train,
+                        self.sampler.full(),
                         |train: &Matrix| {
                             let image = (0..train.rows())
                                 .map(|i| {
@@ -495,7 +476,7 @@ impl DeepRenderApp {
                     self.img_predict.paint(
                         &response,
                         &painter,
-                        (&self.train, &self.model),
+                        (self.sampler.full(), &self.model),
                         |(train, model): (&Matrix, &Model)| {
                             let image = (0..train.rows())
                                 .map(|i| {
@@ -552,7 +533,7 @@ impl eframe::App for DeepRenderApp {
                 });
         }
 
-        match self.train.cols() {
+        match self.sampler.full().cols() {
             2 => {
                 egui::TopBottomPanel::bottom("func_plot")
                     .resizable(true)

@@ -5,6 +5,7 @@ mod fit_model;
 mod matrix;
 mod model;
 mod optimizer;
+mod sampler;
 
 use app::DeepRenderApp;
 
