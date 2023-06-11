@@ -243,9 +243,11 @@ impl DeepRenderApp {
                 ui.radio_value(&mut self.fit_model, FitModel::Xor, "Xor");
                 ui.radio_value(&mut self.fit_model, FitModel::Sine, "Sine");
                 ui.radio_value(&mut self.fit_model, FitModel::SynthImage, "SynthImage");
+                #[cfg(not(target_arch = "wasm32"))]
                 ui.radio_value(&mut self.fit_model, FitModel::FileImage, "FileImage");
             });
 
+            #[cfg(not(target_arch = "wasm32"))]
             ui.horizontal(|ui| {
                 ui.label("File name:");
                 ui.add_enabled(

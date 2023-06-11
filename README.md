@@ -64,3 +64,6 @@ You can build the application to WebAssembly and run on the browser.
 * Install [trunk](https://github.com/thedodd/trunk) by `cargo install trunk`
 * Run `trunk serve` for development server, or
 * Run `trunk build --release` for release build in `eframe/dist`
+
+Note that you cannot use File Image as the fit model with Wasm build.
+Please use local build if you want that feature (it is faster to train on local build anyway).

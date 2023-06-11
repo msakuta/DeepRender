@@ -21,6 +21,7 @@ pub(crate) enum FitModel {
     /// Synthetic image
     SynthImage,
     /// Image loaded from file
+    #[cfg(not(target_arch = "wasm32"))]
     FileImage,
     /// A synthesized image by ray tracing renderer
     RaytraceImage,
@@ -72,6 +73,7 @@ impl FitModel {
                 let sampler = Box::new(MatrixSampler::new(Matrix::from_slice(&data)));
                 Ok((sampler, Some([image_width; 2])))
             }
+            #[cfg(not(target_arch = "wasm32"))]
             Self::FileImage => {
                 let img = ImageReader::open(file_name)?.decode()?.into_luma8();
                 let width = img.width();
