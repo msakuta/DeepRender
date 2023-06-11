@@ -53,3 +53,12 @@ See [this document](https://github.com/msakuta/typst-test/blob/gh-pages/neural-n
 Install [Rust](https://www.rust-lang.org/).
 
     cargo r
+
+## How to build Wasm version
+
+You can build the application to WebAssembly and run on the browser.
+
+* Install [wasm-pack](https://rustwasm.github.io/wasm-pack/)
+* Install [trunk](https://github.com/thedodd/trunk) by `cargo install trunk`
+* Run `trunk serve` for development server, or
+* Run `trunk build --release` for release build in `eframe/dist`

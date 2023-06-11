@@ -136,7 +136,9 @@ impl DeepRenderApp {
                     let end = ((i + 1) * self.batch_size).min(self.train.rows());
                     let mut train = Matrix::zeros(end - start, self.train.cols());
                     for j in start..end {
-                        train.row_mut(j - start).copy_from_slice(self.train.row(order[j]));
+                        train
+                            .row_mut(j - start)
+                            .copy_from_slice(self.train.row(order[j]));
                     }
                     self.model.learn(rate, &train);
                 }
