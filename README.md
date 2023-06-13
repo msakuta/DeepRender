@@ -45,10 +45,15 @@ There are 4 models to train:
 * sinusoidal function
 * Synthetic image (2D function field)
 * An image
+* A 3D scene rendered with ray tracing renderer ([ray-rust](https://github.com/msakuta/ray-rust))
 
 You can switch the model, activation functions, the network architecture and the descent rate in real time.
 
 See [this document](https://github.com/msakuta/typst-test/blob/gh-pages/neural-network.pdf) for more details about the theoretical background.
+
+This project is inspired by this video series, where deep learning framework is implemented in plain C (if you can do it in C, why not in Rust?):
+https://youtu.be/PGSba51aRYU
+
 
 # How to build
 
