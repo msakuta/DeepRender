@@ -103,7 +103,7 @@ impl Sampler for RaytraceSampler {
             samples[(i, 0)] = ray_x as f64;
             samples[(i, 1)] = ray_y as f64;
             samples[(i, 2)] = angle as f64 - 0.5;
-            render(
+            let _ = render(
                 &self.render_env,
                 &mut |_x, _y, color| samples[(i, 3)] = color.r as f64,
                 1,

@@ -96,7 +96,7 @@ impl FitModel {
             Self::RaytraceImage => {
                 let image_size_i = image_size as i32;
                 let image_width = image_size as usize * 2 + 1;
-                let buf = &render_main(image_width);
+                let buf = &render_main(image_width)?;
                 let data: Vec<_> = (-image_size_i..=image_size_i)
                     .map(|y| {
                         (-image_size_i..=image_size_i).map(move |x| {
@@ -117,7 +117,7 @@ impl FitModel {
             }
             Self::Raytrace3D => {
                 let image_size_u = image_size as usize;
-                let buf = &render3d_main(image_size_u, ANGLES as usize);
+                let buf = &render3d_main(image_size_u, ANGLES as usize)?;
                 let data: Vec<_> = (0..ANGLES)
                     .map(|angle| {
                         let angle_offset = angle as usize * image_size_u * image_size_u;
@@ -153,7 +153,7 @@ impl FitModel {
     }
 }
 
-fn render_main(image_width: usize) -> Vec<f32> {
+fn render_main(image_width: usize) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
     let mut materials: HashMap<String, Arc<RenderMaterial>> = HashMap::new();
 
     fn bg(_env: &RenderEnv, _pos: &Vec3) -> RenderColor {
@@ -237,8 +237,8 @@ fn render_main(image_width: usize) -> Vec<f32> {
         &render_env,
         &mut |x, y, color| buf[y as usize * image_width + x as usize] = color.r,
         1,
-    );
-    buf
+    )?;
+    Ok(buf)
 }
 
 pub(crate) fn render_scene(image_size: usize) -> RenderEnv {
@@ -332,7 +332,7 @@ pub(crate) fn angle_to_camera(angle_f: f32) -> (f32, f32, f32) {
     )
 }
 
-fn render3d_main(image_width: usize, angles: usize) -> Vec<f32> {
+fn render3d_main(image_width: usize, angles: usize) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
     let mut render_env = render_scene(image_width);
     let angle_stride = image_width * image_width;
     let mut buf = vec![0.; angle_stride * image_width * image_width];
@@ -349,7 +349,7 @@ fn render3d_main(image_width: usize, angles: usize) -> Vec<f32> {
                 buf[angle * angle_stride + y as usize * image_width + x as usize] = color.r
             },
             1,
-        );
+        )?;
     }
-    buf
+    Ok(buf)
 }
