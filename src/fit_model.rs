@@ -332,7 +332,10 @@ pub(crate) fn angle_to_camera(angle_f: f32) -> (f32, f32, f32) {
     )
 }
 
-fn render3d_main(image_width: usize, angles: usize) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+fn render3d_main(
+    image_width: usize,
+    angles: usize,
+) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
     let mut render_env = render_scene(image_width);
     let angle_stride = image_width * image_width;
     let mut buf = vec![0.; angle_stride * image_width * image_width];

@@ -51,10 +51,10 @@ impl DeepRenderApp {
             };
 
             let mut x = NODE_OFFSET;
-            let mut x_offsets = Vec::with_capacity(self.model.get_weights().len());
+            let mut x_offsets = Vec::with_capacity(self.model.get_weights().len() + 1);
+            x_offsets.push(x);
 
             for (n, weights) in self.model.get_weights().iter().enumerate() {
-                x_offsets.push(x);
                 match self.network_render {
                     NetworkRender::Lines => {
                         for i in 0..weights.rows() {
@@ -98,7 +98,10 @@ impl DeepRenderApp {
                         x += weights.cols() as f32 * PIXEL_SIZE + IMAGE_OFFSET * 2.;
                     }
                 }
+                x_offsets.push(x);
             }
+
+            let last_x = x_offsets.last().copied();
 
             for (weights, x) in self.model.get_weights().iter().zip(x_offsets.into_iter()) {
                 for i in 0..weights.rows() {
@@ -110,6 +113,15 @@ impl DeepRenderApp {
                         (1., Color32::GRAY),
                     );
                 }
+            }
+
+            if let Some(x) = last_x {
+                painter.circle(
+                    to_screen.transform_pos(pos2(x, NODE_OFFSET)),
+                    NODE_RADIUS,
+                    Color32::GRAY,
+                    (1., Color32::GRAY),
+                );
             }
         });
     }
