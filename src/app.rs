@@ -18,6 +18,12 @@ use crate::{
     sampler::{Sampler, TrainBatch},
 };
 
+#[derive(PartialEq, Eq, Debug)]
+enum NetworkRender {
+    Lines,
+    Image,
+}
+
 pub struct DeepRenderApp {
     fit_model: FitModel,
     current_fit_model: FitModel,
@@ -43,6 +49,7 @@ pub struct DeepRenderApp {
     print_weights: bool,
     angle: f64,
     upsample: usize,
+    network_render: NetworkRender,
 
     // Widgets
     img: BgImage,
@@ -87,6 +94,7 @@ impl DeepRenderApp {
             print_weights: true,
             angle: 0.,
             upsample: 1,
+            network_render: NetworkRender::Lines,
             img: BgImage::new(),
             img_predict: BgImage::new(),
         }
@@ -166,7 +174,20 @@ impl DeepRenderApp {
             .collect()
     }
 
-    fn paint_graph(&self, ui: &mut Ui) {
+    fn paint_graph(&mut self, ui: &mut Ui) {
+        ui.horizontal(|ui| {
+            ui.label("Upsample:");
+            ui.radio_value(&mut self.network_render, NetworkRender::Lines, "Lines");
+            ui.radio_value(&mut self.network_render, NetworkRender::Image, "Image");
+        });
+
+        const NODE_OFFSET: f32 = 30.;
+        const NODE_RADIUS: f32 = 7.;
+        const NODE_INTERVAL: f32 = NODE_RADIUS * 3.;
+        const LAYER_INTERVAL: f32 = 70.;
+        const PIXEL_SIZE: f32 = 5.;
+        const IMAGE_OFFSET: f32 = 10. + NODE_RADIUS;
+
         Frame::canvas(ui.style()).show(ui, |ui| {
             let (response, painter) =
                 ui.allocate_painter(ui.available_size(), egui::Sense::hover());
@@ -176,49 +197,78 @@ impl DeepRenderApp {
                 response.rect,
             );
 
-            let to_color = |weights: &Matrix, i| {
-                let weight = weights[(i, 0)];
+            let to_rgb = |weight: f64| {
                 if weight < 0. {
-                    Color32::from_rgb((weight.abs() * 255.).min(255.).max(0.) as u8, 0, 0)
+                    [(weight.abs() * 255.).min(255.).max(0.) as u8, 0, 0]
                 } else {
-                    Color32::from_rgb(0, (weights[(i, 0)] * 255.).min(255.).max(0.) as u8, 0)
+                    [0, (weight * 255.).min(255.).max(0.) as u8, 0]
                 }
             };
 
+            let to_color = |weight: f64| {
+                let rgb = to_rgb(weight);
+                Color32::from_rgb(rgb[0], rgb[1], rgb[2])
+            };
+
+            let mut x = NODE_OFFSET;
+            let mut x_offsets = Vec::with_capacity(self.model.get_weights().len());
+
             for (n, weights) in self.model.get_weights().iter().enumerate() {
-                let x = 30. + n as f32 * 70.;
+                x_offsets.push(x);
+                match self.network_render {
+                    NetworkRender::Lines => {
+                        for i in 0..weights.rows() {
+                            // let rect = Rect{ min: pos2(30., 30. + i as f32 * 30.), max: pos2(80., 50. + i as f32 * 30.) };
+                            let soure = pos2(x, NODE_OFFSET + i as f32 * NODE_INTERVAL);
+                            for j in 0..self.model.get_arch()[n + 1] {
+                                let dest = pos2(
+                                    x + LAYER_INTERVAL,
+                                    NODE_OFFSET + j as f32 * NODE_INTERVAL,
+                                );
+                                painter.line_segment(
+                                    [
+                                        to_screen.transform_pos(soure),
+                                        to_screen.transform_pos(dest),
+                                    ],
+                                    (1., to_color(weights[(i, j)])),
+                                );
+                            }
+                        }
+                        x += LAYER_INTERVAL;
+                    }
+                    NetworkRender::Image => {
+                        let mut img = BgImage::new();
+                        img.paint(
+                            &response,
+                            &painter,
+                            weights,
+                            |weights: &Matrix| {
+                                let image = weights
+                                    .flat()
+                                    .iter()
+                                    .copied()
+                                    .map(to_rgb)
+                                    .flatten()
+                                    .collect::<Vec<_>>();
+                                egui::ColorImage::from_rgb([weights.cols(), weights.rows()], &image)
+                            },
+                            [x + IMAGE_OFFSET, 25.],
+                            PIXEL_SIZE,
+                        );
+                        x += weights.cols() as f32 * PIXEL_SIZE + IMAGE_OFFSET * 2.;
+                    }
+                }
+            }
+
+            for (weights, x) in self.model.get_weights().iter().zip(x_offsets.into_iter()) {
                 for i in 0..weights.rows() {
-                    // let rect = Rect{ min: pos2(30., 30. + i as f32 * 30.), max: pos2(80., 50. + i as f32 * 30.) };
-                    let center = pos2(x, 30. + i as f32 * 30.);
+                    let center = pos2(x, NODE_OFFSET + i as f32 * NODE_INTERVAL);
                     painter.circle(
                         to_screen.transform_pos(center),
-                        10.,
-                        to_color(weights, i),
+                        NODE_RADIUS,
+                        to_color(weights[(i, 0)]),
                         (1., Color32::GRAY),
                     );
-                }
-
-                let center = pos2(x + 70., 30. + weights.cols() as f32 / 2.);
-                painter.circle(
-                    to_screen.transform_pos(center),
-                    10.,
-                    Color32::from_rgb(255, 0, 0),
-                    (1., Color32::GRAY),
-                );
-
-                for i in 0..weights.rows() {
-                    // let rect = Rect{ min: pos2(30., 30. + i as f32 * 30.), max: pos2(80., 50. + i as f32 * 30.) };
-                    let soure = pos2(x, 30. + i as f32 * 30.);
-                    for j in 0..self.model.get_arch()[n + 1] {
-                        let dest = pos2(x + 70., 30. + j as f32 * 30.);
-                        painter.line_segment(
-                            [
-                                to_screen.transform_pos(soure),
-                                to_screen.transform_pos(dest),
-                            ],
-                            (1., to_color(weights, i)),
-                        );
-                    }
                 }
             }
         });
