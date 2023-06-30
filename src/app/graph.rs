@@ -16,7 +16,7 @@ pub(super) enum NetworkRender {
 impl DeepRenderApp {
     pub(super) fn paint_graph(&mut self, ui: &mut Ui) {
         ui.horizontal(|ui| {
-            ui.label("Upsample:");
+            ui.label("Weights plot:");
             ui.radio_value(&mut self.network_render, NetworkRender::Lines, "Lines");
             ui.radio_value(&mut self.network_render, NetworkRender::Image, "Image");
         });
@@ -115,13 +115,15 @@ impl DeepRenderApp {
                 }
             }
 
-            if let Some(x) = last_x {
-                painter.circle(
-                    to_screen.transform_pos(pos2(x, NODE_OFFSET)),
-                    NODE_RADIUS,
-                    Color32::GRAY,
-                    (1., Color32::GRAY),
-                );
+            if let Some((x, rows)) = last_x.zip(self.model.get_arch().last()) {
+                for y in 0..*rows {
+                    painter.circle(
+                        to_screen.transform_pos(pos2(x, NODE_OFFSET + y as f32 * NODE_INTERVAL)),
+                        NODE_RADIUS,
+                        Color32::GRAY,
+                        (1., Color32::GRAY),
+                    );
+                }
             }
         });
     }
